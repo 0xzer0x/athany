@@ -104,9 +104,12 @@ def display_main_window(main_win_layout, upcoming_prayers):
             elif event2 == "Set athan" and values2[0] in AVAILABLE_ADHANS:
                 print("You chose {} athan".format(values2[0]))
             elif event2 == "Delete saved location data":
-                print("[DEBUG] Deleting saved location data...")
-                sg.user_settings_delete_entry('-city-')
-                sg.user_settings_delete_entry('-country-')
+                if sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
+                    print("[DEBUG] Deleting saved location data...")
+                    sg.user_settings_delete_entry('-city-')
+                    sg.user_settings_delete_entry('-country-')
+                else:
+                    print("[DEBUG] There's nothing to delete!")
     # close application on exit
     application_tray.close()
     window.close()
@@ -277,6 +280,7 @@ try:
 except KeyboardInterrupt:
     exit()
 
-if not SAVE_LOCATION:  # user doesnt want to save settings
+# user doesnt want to save settings
+if not SAVE_LOCATION and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
     sg.user_settings_delete_entry('-city-')
     sg.user_settings_delete_entry('-country-')
