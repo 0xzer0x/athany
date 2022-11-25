@@ -1,3 +1,4 @@
 PySimpleGUI
 psgtray
 requests
+playsound
