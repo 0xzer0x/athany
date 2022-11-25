@@ -1,5 +1,6 @@
 # Athany: a python application to remind you of your purpose
- 
+<br>
+
 ### قال تعالى: {وَمَا خَلَقْتُ الْجِنَّ وَالْإِنسَ إِلَّا لِيَعْبُدُونِ (56)} \[الذاريات]
  
 <br>
