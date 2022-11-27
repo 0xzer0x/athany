@@ -1,23 +1,29 @@
 """Python application to fetch prayer times, display them in a GUI and play adhan"""
+import os
 import json
 import datetime
-import os
 import requests
 import playsound
 import PySimpleGUI as sg
 from psgtray import SystemTray
+
+# ------------------------------------- Application Settings ------------------------------------- #
 
 DATA_DIR = os.path.join(os.getcwd(), 'Data')
 
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
 
-UPCOMING_PRAYERS = []
+sg.theme("DarkAmber")
 sg.user_settings_filename(filename='athany-config.json')
+if not sg.user_settings_get_entry('-athan_sound-'):
+    sg.user_settings_set_entry('-athan_sound-', value='Default.mp3')
+
+UPCOMING_PRAYERS = []
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
-AVAILABLE_ADHANS = ['Mekka', 'Jerusalem', 'Egypt',
-                    'Mishari Afasi', 'Husari', 'Abdul-basit Abdul-samad']
+AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
+                    'Abdul-basit Abdul-samad', 'Mishari Alafasy', 'Islam Sobhy']
 
 NOW = datetime.datetime.now()
 CURRENT_YEAR = NOW.year
@@ -28,6 +34,15 @@ GUI_FONT = "Calibri"
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
 
+
+def play_selected_athan() -> None:
+    """ fetches current settings for athan and plays the corresponding athan, NOTICE: causes application to stop responding while the athan is playing """
+    current_athan_path = os.path.join(
+        DATA_DIR, sg.user_settings_get_entry('-athan_sound-'))
+    playsound.playsound(current_athan_path)
+
+
+# ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
 
 def display_main_window(main_win_layout, upcoming_prayers):
     """Displays the main application window, keeps running until window is closed"""
@@ -41,11 +56,16 @@ def display_main_window(main_win_layout, upcoming_prayers):
 
         if now >= upcoming_prayers[0][1]:
             application_tray.show_message(
-                title="Athany", message=f"{upcoming_prayers[0][0]} salah time has come :D")
-            # play athan sound
-            upcoming_prayers.pop(0)
-            playsound.playsound("Data/default-athan.mp3")
+                title="Athany", message=f"It's time for {upcoming_prayers[0][0]} prayer")
 
+            # remove current fard from list, update remaining time to be 0 before playing athan sound
+            upcoming_prayers.pop(0)
+            window['-TIME_D-'].update(value='00:00:00')
+
+            # play athan sound from user athan sound settings
+            play_selected_athan()
+
+            # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
             if len(upcoming_prayers) == 0:
                 upcoming_prayers = update_prayers_list()
                 for prayer in upcoming_prayers:
@@ -74,7 +94,7 @@ def display_main_window(main_win_layout, upcoming_prayers):
         if event1 in (sg.WIN_CLOSED, "Exit"):
             break
 
-        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
+        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Minimize"):
             window.hide()
             application_tray.show_icon()
 
@@ -85,12 +105,13 @@ def display_main_window(main_win_layout, upcoming_prayers):
         # if clicked settings button, open up the settings window and read values from it along with the main window
         elif event1 == "Settings" and not win2_active:
             win2_active = True
+            current_athan = sg.user_settings_get_entry(
+                '-athan_sound-').split('.')[0].replace("_", " ")
             settings_layout = [
                 [sg.Text("Athan sound"),
-                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS), sg.Button("Set athan")],
-                [sg.HorizontalSeparator(color="dark brown")],
+                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True, default_value=current_athan), sg.Button("Set athan")],
                 [sg.Button("Delete saved location data"),
-                 sg.Push(), sg.Button("Exit")]
+                 sg.Push(), sg.Button("Done")]
             ]
 
             settings_window = sg.Window(
@@ -98,11 +119,16 @@ def display_main_window(main_win_layout, upcoming_prayers):
 
         if win2_active:
             event2, values2 = settings_window.read(timeout=100)
-            if event2 in (sg.WIN_CLOSED, "Exit"):
+            if event2 in (sg.WIN_CLOSED, "Done"):
                 win2_active = False
                 settings_window.close()
             elif event2 == "Set athan" and values2[0] in AVAILABLE_ADHANS:
-                print("You chose {} athan".format(values2[0]))
+                # Debugging
+                print(f"You chose {values2[0]} athan")
+                sg.user_settings_set_entry(
+                    '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.mp3")
+                print(sg.user_settings_get_entry("-athan_sound-"))
+                play_selected_athan()
             elif event2 == "Delete saved location data":
                 if sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
                     print("[DEBUG] Deleting saved location data...")
@@ -115,6 +141,20 @@ def display_main_window(main_win_layout, upcoming_prayers):
     window.close()
 
 
+def start_system_tray(win: sg.Window):
+    """starts the SystemTray object and instantiates it's menu and tooltip"""
+    menu = ['', ['Show Window', 'Hide Window', '---',
+                 'Settings', 'Exit']]
+    tooltip = 'Next prayer X in Y'
+    tray = SystemTray(menu=menu, tooltip=tooltip,
+                      window=win, icon=APP_ICON)
+    tray.show_message(
+        title="Athany", message="Press 'Minimize' to minimize application to system tray")
+    return tray
+
+
+# ------------------------------------- Main Application logic ------------------------------------- #
+
 def update_prayers_list() -> list:
     """function to update upcoming prayers after isha prayer"""
     updated_list = set_main_layout_and_upcoming_prayers(
@@ -123,17 +163,6 @@ def update_prayers_list() -> list:
     )[1]
 
     return updated_list
-
-
-def start_system_tray(win: sg.Window):
-    """starts the SystemTray object and instantiates it's menu and tooltip"""
-    menu = ['', ['Show Window', 'Hide Window', '---',
-                 'Change Adhan sound', AVAILABLE_ADHANS, 'Exit']]
-    tooltip = 'Next prayer X in Y'
-    tray = SystemTray(menu=menu, tooltip=tooltip,
-                      window=win, icon=APP_ICON)
-    tray.show_message(title="Athany", message="System tray icon started!")
-    return tray
 
 
 def fetch_calender_data(cit: str, count: str) -> dict:
@@ -188,14 +217,15 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
         t = v.split(" ")[0] + f" {DAY} {CURRENT_MON} {CURRENT_YEAR}"
         current_times[k] = datetime.datetime.strptime(
             t, "%H:%M %d %m %Y")
-        # for debugging
-        if k in FUROOD_NAMES:
+
+        if k in FUROOD_NAMES:  # for debugging
             print(k, current_times[k].strftime("%I:%M %p"))
 
     for prayer, time in current_times.items():  # append upcoming prayers to list
         if NOW < time and prayer in FUROOD_NAMES:
             UPCOMING_PRAYERS.append([prayer, time])
 
+    # setting the main window layout with the inital prayer times
     prayer_times_layout = [
         [sg.Text("Current Date", font=GUI_FONT), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
          sg.Text(f"{NOW.date()}", font=GUI_FONT, key="-CURRENT_DATE-")],
@@ -213,17 +243,19 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
          sg.Text(f"{current_times['Isha'].strftime('%I:%M %p')}", font=GUI_FONT, key="-ISHA TIME-")],
         [sg.HorizontalSeparator(color="dark brown")],
         [sg.Button("Settings"), sg.Push(),
-            sg.Button("Hide Window"), sg.Button("Exit")]
+            sg.Button("Minimize"), sg.Button("Exit")]
     ]
     return prayer_times_layout, UPCOMING_PRAYERS
 
 
-sg.theme("DarkAmber")
-# define the layouts for the app
+# ------------------------------------- Option To Choose Location If Not Saved Before ------------------------------------- #
+
+# define the layout for the 'choose location' window
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-', font=GUI_FONT)],
                        [sg.Text("City", font=GUI_FONT), sg.Input(size=(15, 1), key="-CITY-", focus=True),
-                        sg.Text("Country", font=GUI_FONT), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.Button("Ok", font=GUI_FONT), sg.Button("Cancel", font=GUI_FONT)]]
+                       sg.Text("Country", font=GUI_FONT), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
+                       [sg.HorizontalSeparator(color="dark brown")],
+                       [sg.Button("Ok", size=(10, 1), font=GUI_FONT), sg.Push(), sg.Button("Cancel", size=(10, 1), font=GUI_FONT)]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
@@ -273,6 +305,7 @@ else:
     main_layout, UPCOMING_PRAYERS = set_main_layout_and_upcoming_prayers(
         saved_location_api_res)
 
+# ------------------------------------- Starts The GUI ------------------------------------- #
 
 try:
     display_main_window(main_win_layout=main_layout,
@@ -280,7 +313,7 @@ try:
 except KeyboardInterrupt:
     exit()
 
-# user doesnt want to save settings
+# If user doesn't want to save settings, delete saved entries before closing
 if not SAVE_LOCATION and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
     sg.user_settings_delete_entry('-city-')
     sg.user_settings_delete_entry('-country-')
