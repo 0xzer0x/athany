@@ -123,11 +123,11 @@ def display_main_window(main_win_layout, upcoming_prayers):
                 win2_active = False
                 settings_window.close()
             elif event2 == "Set athan" and values2[0] in AVAILABLE_ADHANS:
-                # Debugging
-                print(f"You chose {values2[0]} athan")
                 sg.user_settings_set_entry(
                     '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.mp3")
-                print(sg.user_settings_get_entry("-athan_sound-"))
+                # Debugging
+                print(f"[DEBUG] You chose {values2[0]} athan")
+                print("[DEBUG]", sg.user_settings_get_entry("-athan_sound-"))
             elif event2 == "Delete saved location data":
                 if sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
                     print("[DEBUG] Deleting saved location data...")
