@@ -128,7 +128,6 @@ def display_main_window(main_win_layout, upcoming_prayers):
                 sg.user_settings_set_entry(
                     '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.mp3")
                 print(sg.user_settings_get_entry("-athan_sound-"))
-                play_selected_athan()
             elif event2 == "Delete saved location data":
                 if sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
                     print("[DEBUG] Deleting saved location data...")
