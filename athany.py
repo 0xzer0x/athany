@@ -25,10 +25,6 @@ FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
                     'Abdul-basit Abdul-samad', 'Mishari Alafasy', 'Islam Sobhy']
 
-NOW = datetime.datetime.now()
-CURRENT_YEAR = NOW.year
-CURRENT_MON = NOW.month
-CURRENT_DAY = NOW.day
 
 GUI_FONT = "Calibri"
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
@@ -187,8 +183,13 @@ def fetch_calender_data(cit: str, count: str) -> dict:
      Return:
         month_data (dict) - api response json data dictionary
     """
+
+    now = datetime.datetime.now()
+    current_mon = now.month
+    current_year = now.year
+
     json_month_file = os.path.join(
-        DATA_DIR, f"{CURRENT_MON}-{cit}-{count}.json")
+        DATA_DIR, f"{current_year}-{current_mon}-{cit}-{count}.json")
 
     if not os.path.exists(json_month_file):
         res = requests.get(
@@ -214,7 +215,11 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
             prayer_times_layout (list) - main window layout based on the timings fetched from api_res
             UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed
     """
-    current_times = api_res["data"][CURRENT_DAY-1]["timings"]
+    now = datetime.datetime.now()
+    current_year = now.year
+    current_mon = now.month
+    current_day = now.day
+    current_times = api_res["data"][current_day-1]["timings"]
 
     ISHA_OBJ = current_times['Isha'].split()
 
@@ -222,16 +227,16 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
     # Prayer times change after Isha athan to the times of the following day
     # if NOW is after current Isha time
     ISHA_PASSED = False
-    if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {CURRENT_DAY} {CURRENT_MON} {CURRENT_YEAR}", "%H:%M %d %m %Y"):
+    if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {current_day} {current_mon} {current_year}", "%H:%M %d %m %Y"):
         # replace all prayer times with the next day prayers
-        current_times = api_res["data"][CURRENT_DAY]["timings"]
+        current_times = api_res["data"][current_day]["timings"]
         ISHA_PASSED = True
 
     # loop through all prayer times to convert timing to datetime objects to be able to preform operations on them
     for k, v in current_times.items():
         # to adjust the day,month, year of the prayer datetime object
-        DAY = CURRENT_DAY+1 if ISHA_PASSED else CURRENT_DAY
-        t = v.split(" ")[0] + f" {DAY} {CURRENT_MON} {CURRENT_YEAR}"
+        DAY = current_day+1 if ISHA_PASSED else current_day
+        t = v.split(" ")[0] + f" {DAY} {current_mon} {current_year}"
         current_times[k] = datetime.datetime.strptime(
             t, "%H:%M %d %m %Y")
 
@@ -239,13 +244,13 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
             print(k, current_times[k].strftime("%I:%M %p"))
 
     for prayer, time in current_times.items():  # append upcoming prayers to list
-        if NOW < time and prayer in FUROOD_NAMES:
+        if now < time and prayer in FUROOD_NAMES:
             UPCOMING_PRAYERS.append([prayer, time])
 
     # setting the main window layout with the inital prayer times
     prayer_times_layout = [
         [sg.Text("Current Date", font=GUI_FONT), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{NOW.date()}", font=GUI_FONT, key="-CURRENT_DATE-")],
+         sg.Text(f"{now.date()}", font=GUI_FONT, key="-CURRENT_DATE-")],
         [sg.Text("Next Prayer:", font=GUI_FONT), sg.Push(),
             sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Push(), sg.Text("in", font=GUI_FONT), sg.Push(), sg.Text(font=GUI_FONT, key="-TIME_D-")],
         [sg.Text("Fajr: ", font=GUI_FONT), sg.Push(),
