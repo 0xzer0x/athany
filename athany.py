@@ -1,6 +1,7 @@
 """Python application to fetch prayer times, display them in a GUI and play adhan"""
 import os
 import json
+import sys
 import datetime
 import requests
 import simpleaudio
@@ -45,7 +46,7 @@ def play_selected_athan() -> simpleaudio.PlayObject:
 def display_main_window(main_win_layout, upcoming_prayers):
     """Displays the main application window, keeps running until window is closed"""
     window = sg.Window("Athany: a python athan app",
-                       main_win_layout, finalize=True, icon=APP_ICON) if main_win_layout else exit()
+                       main_win_layout, finalize=True, icon=APP_ICON) if main_win_layout else sys.exit()
 
     application_tray = start_system_tray(win=window)
     win2_active = False
@@ -94,7 +95,7 @@ def display_main_window(main_win_layout, upcoming_prayers):
         if event1 in (sg.WIN_CLOSED, "Exit"):
             break
 
-        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Minimize"):
+        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Minimize", "Hide Window"):
             window.hide()
             application_tray.show_icon()
 
@@ -333,7 +334,7 @@ try:
     display_main_window(main_win_layout=main_layout,
                         upcoming_prayers=UPCOMING_PRAYERS)
 except KeyboardInterrupt:
-    exit()
+    sys.exit()
 
 # If user doesn't want to save settings, delete saved entries before closing
 if not SAVED_LOCATION and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
