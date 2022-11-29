@@ -33,7 +33,10 @@ with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
 
 
 def play_selected_athan() -> simpleaudio.PlayObject:
-    """ fetches current settings for athan and plays the corresponding athan, NOTICE: causes application to stop responding while the athan is playing """
+    """ fetches current settings for athan and plays the corresponding athan
+        Return:
+            play_obj (simpleaudio.PlayObject) - play object to control playback of athan
+    """
     current_athan_path = os.path.join(
         DATA_DIR, sg.user_settings_get_entry('-athan_sound-'))
     wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
@@ -63,7 +66,7 @@ def display_main_window(main_win_layout, upcoming_prayers):
             window['-TIME_D-'].update(value='00:00:00')
 
             # play athan sound from user athan sound settings
-            play_selected_athan()
+            athan_play_obj = play_selected_athan()
 
             # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
             if len(upcoming_prayers) == 0:
