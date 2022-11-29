@@ -1,4 +1,4 @@
 PySimpleGUI
 psgtray
 requests
-playsound
+simpleaudio

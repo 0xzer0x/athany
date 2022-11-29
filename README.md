@@ -13,15 +13,16 @@
 ## Requirements
  
 - Python3 (tested on pyhon 3.10 & 3.11)
+
 - `tk` tkinter package if you're on linux, install it using your package manager. If you can't find it, search how to install tkinter on your distro.
- 
+
 - `PySimpleGUI` python module
- 
+
 - `psgtray` python module
- 
+
 - `requests` python module
 
-- `playsound` python module
+- `simpleaudio` python module
 
 ## Installation
 

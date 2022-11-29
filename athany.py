@@ -3,7 +3,7 @@ import os
 import json
 import datetime
 import requests
-import playsound
+import simpleaudio
 import PySimpleGUI as sg
 from psgtray import SystemTray
 
@@ -17,7 +17,7 @@ if not os.path.exists(DATA_DIR):
 sg.theme("DarkAmber")
 sg.user_settings_filename(filename='athany-config.json')
 if not sg.user_settings_get_entry('-athan_sound-'):
-    sg.user_settings_set_entry('-athan_sound-', value='Default.mp3')
+    sg.user_settings_set_entry('-athan_sound-', value='Default.wav')
 
 UPCOMING_PRAYERS = []
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
@@ -35,11 +35,13 @@ with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
 
 
-def play_selected_athan() -> None:
+def play_selected_athan() -> simpleaudio.PlayObject:
     """ fetches current settings for athan and plays the corresponding athan, NOTICE: causes application to stop responding while the athan is playing """
     current_athan_path = os.path.join(
         DATA_DIR, sg.user_settings_get_entry('-athan_sound-'))
-    playsound.playsound(current_athan_path)
+    wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
+    play_obj = wave_obj.play()
+    return play_obj
 
 
 # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
@@ -51,6 +53,7 @@ def display_main_window(main_win_layout, upcoming_prayers):
 
     application_tray = start_system_tray(win=window)
     win2_active = False
+    athan_play_obj = None
     while True:
         now = datetime.datetime.now().replace(microsecond=0)
 
@@ -88,7 +91,8 @@ def display_main_window(main_win_layout, upcoming_prayers):
 
         if event1 == application_tray.key:
             event1 = values1[event1]
-            print(event1)
+            # Debugging
+            print("[DEBUG] SystemTray event:", event1)
 
         # Event check and preform action
         if event1 in (sg.WIN_CLOSED, "Exit"):
@@ -102,14 +106,19 @@ def display_main_window(main_win_layout, upcoming_prayers):
             window.un_hide()
             window.bring_to_front()
 
+        elif event1 == "Stop athan" and athan_play_obj:
+            if athan_play_obj.is_playing():
+                athan_play_obj.stop()
+
         # if clicked settings button, open up the settings window and read values from it along with the main window
         elif event1 == "Settings" and not win2_active:
             win2_active = True
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
             settings_layout = [
-                [sg.Text("Athan sound"),
-                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True, default_value=current_athan), sg.Button("Set athan")],
+                [sg.Text("Athan sound", key="-DISPLAYED_MSG-")],
+                [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
+                          default_value=current_athan), sg.Push(), sg.Button("Set athan")],
                 [sg.Button("Delete saved location data"),
                  sg.Push(), sg.Button("Done")]
             ]
@@ -117,6 +126,7 @@ def display_main_window(main_win_layout, upcoming_prayers):
             settings_window = sg.Window(
                 "Athany settings", settings_layout, icon=APP_ICON)
 
+        # If 2nd window (settings window) is open, read values from it
         if win2_active:
             event2, values2 = settings_window.read(timeout=100)
             if event2 in (sg.WIN_CLOSED, "Done"):
@@ -124,10 +134,18 @@ def display_main_window(main_win_layout, upcoming_prayers):
                 settings_window.close()
             elif event2 == "Set athan" and values2[0] in AVAILABLE_ADHANS:
                 sg.user_settings_set_entry(
-                    '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.mp3")
+                    '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.wav")
+
+                settings_window['-DISPLAYED_MSG-'].update(
+                    value=f"Athan was successfully set to {values2[0]}")
+
                 # Debugging
                 print(f"[DEBUG] You chose {values2[0]} athan")
                 print("[DEBUG]", sg.user_settings_get_entry("-athan_sound-"))
+                if athan_play_obj:
+                    athan_play_obj.stop()
+                athan_play_obj = play_selected_athan()
+
             elif event2 == "Delete saved location data":
                 if sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
                     print("[DEBUG] Deleting saved location data...")
@@ -229,7 +247,7 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
         [sg.Text("Current Date", font=GUI_FONT), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
          sg.Text(f"{NOW.date()}", font=GUI_FONT, key="-CURRENT_DATE-")],
         [sg.Text("Next Prayer:", font=GUI_FONT), sg.Push(),
-            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Text("in", font=GUI_FONT), sg.Text(font=GUI_FONT, key="-TIME_D-")],
+            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Push(), sg.Text("in", font=GUI_FONT), sg.Push(), sg.Text(font=GUI_FONT, key="-TIME_D-")],
         [sg.Text("Fajr: ", font=GUI_FONT), sg.Push(),
          sg.Text(f"{current_times['Fajr'].strftime('%I:%M %p')}", font=GUI_FONT, key="-FAJR TIME-")],
         [sg.Text("Dhuhr: ", font=GUI_FONT), sg.Push(),
@@ -241,7 +259,7 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
         [sg.Text("Isha: ", font=GUI_FONT), sg.Push(),
          sg.Text(f"{current_times['Isha'].strftime('%I:%M %p')}", font=GUI_FONT, key="-ISHA TIME-")],
         [sg.HorizontalSeparator(color="dark brown")],
-        [sg.Button("Settings"), sg.Push(),
+        [sg.Button("Settings"), sg.Button("Stop athan"), sg.Push(),
             sg.Button("Minimize"), sg.Button("Exit")]
     ]
     return prayer_times_layout, UPCOMING_PRAYERS
@@ -285,7 +303,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                 sg.user_settings_set_entry('-country-',
                                            values['-COUNTRY-'])
 
-                SAVE_LOCATION = True if values['-SAVE_LOC_CHECK-'] else False
+                SAVED_LOCATION = True if values['-SAVE_LOC_CHECK-'] else False
 
                 main_layout, UPCOMING_PRAYERS = set_main_layout_and_upcoming_prayers(
                     m_data)
@@ -295,7 +313,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
 
     choose_location.close()
 else:
-    SAVE_LOCATION = True
+    SAVED_LOCATION = True
     saved_location_api_res = fetch_calender_data(
         sg.user_settings_get_entry('-city-'),
         sg.user_settings_get_entry('-country-')
@@ -313,6 +331,6 @@ except KeyboardInterrupt:
     exit()
 
 # If user doesn't want to save settings, delete saved entries before closing
-if not SAVE_LOCATION and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
+if not SAVED_LOCATION and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
     sg.user_settings_delete_entry('-city-')
     sg.user_settings_delete_entry('-country-')
