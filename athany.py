@@ -9,8 +9,9 @@ import PySimpleGUI as sg
 from psgtray import SystemTray
 
 # ------------------------------------- Application Settings ------------------------------------- #
-
-DATA_DIR = os.path.join(os.getcwd(), 'Data')
+DATA_DIR = os.path.join(
+    os.path.abspath(__file__).split("athany.py")[0], 'Data'
+)
 
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
@@ -46,8 +47,11 @@ def play_selected_athan() -> simpleaudio.PlayObject:
 
 # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
 
-def display_main_window(main_win_layout, upcoming_prayers):
-    """Displays the main application window, keeps running until window is closed"""
+def display_main_window(main_win_layout, upcoming_prayers, save_loc_check) -> bool:
+    """Displays the main application window, keeps running until window is closed\n
+    Return:
+        save_loc_check (bool) - boolean value whether the user wants to save his location data or not after application is closed
+    """
     window = sg.Window("Athany: a python athan app",
                        main_win_layout, finalize=True, icon=APP_ICON) if main_win_layout else sys.exit()
 
@@ -147,15 +151,14 @@ def display_main_window(main_win_layout, upcoming_prayers):
                 athan_play_obj = play_selected_athan()
 
             elif event2 == "Delete saved location data":
-                if sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
-                    print("[DEBUG] Deleting saved location data...")
-                    sg.user_settings_delete_entry('-city-')
-                    sg.user_settings_delete_entry('-country-')
-                else:
-                    print("[DEBUG] There's nothing to delete!")
+                print("[DEBUG] Deleting saved location data...")
+                save_loc_check = False
+                settings_window['-DISPLAYED_MSG-'].update(
+                    value="Location settings will be deleted on exit")
     # close application on exit
     application_tray.close()
     window.close()
+    return save_loc_check
 
 
 def start_system_tray(win: sg.Window):
@@ -174,30 +177,25 @@ def start_system_tray(win: sg.Window):
 
 def update_prayers_list() -> list:
     """function to update upcoming prayers after isha prayer"""
-    updated_list = set_main_layout_and_upcoming_prayers(
-        fetch_calender_data(sg.user_settings_get_entry('-city-'),
-                            sg.user_settings_get_entry('-country-'))
-    )[1]
+    updated_list = set_main_layout_and_upcoming_prayers(fetch_calender_data(sg.user_settings_get_entry(
+        '-city-'), sg.user_settings_get_entry('-country-'), date=datetime.datetime.now()))[1]
 
     return updated_list
 
 
-def fetch_calender_data(cit: str, count: str) -> dict:
-    """ check if calender data for the city+country+month exists and fetch it if not
+def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
+    """ check if calender data for the city+country+month+year exists and fetch it if not
      Return:
         month_data (dict) - api response json data dictionary
     """
-
-    now = datetime.datetime.now()
-    current_mon = now.month
-    current_year = now.year
-
+    cit = cit.lower()
+    count = count.lower()
     json_month_file = os.path.join(
-        DATA_DIR, f"{current_year}-{current_mon}-{cit}-{count}.json")
+        DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
 
     if not os.path.exists(json_month_file):
         res = requests.get(
-            API_ENDPOINT+f"?city={cit}&country={count}", timeout=60)
+            API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}", timeout=300)
 
         if res.status_code != 200:  # if invalid city or country, return None instead of filename
             return None
@@ -220,32 +218,39 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
             UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed
     """
     now = datetime.datetime.now()
-    current_year = now.year
-    current_mon = now.month
-    current_day = now.day
-    current_times = api_res["data"][current_day-1]["timings"]
+    tomorrow = now+datetime.timedelta(days=1)
+    current_times = api_res["data"][now.day-1]["timings"]
 
     ISHA_OBJ = current_times['Isha'].split()
-
+    ISHA_PASSED = False
     # Check if Isha passed as to get the following day timings
     # Prayer times change after Isha athan to the times of the following day
     # if NOW is after current Isha time
-    ISHA_PASSED = False
-    if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {current_day} {current_mon} {current_year}", "%H:%M %d %m %Y"):
+    if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {now.day} {now.month} {now.year}", "%H:%M %d %m %Y"):
         # replace all prayer times with the next day prayers
-        current_times = api_res["data"][current_day]["timings"]
+        if tomorrow.day < now.day:  # SPECIAL CASE: if today is the last day in the month, fetch new month calender and adjust the timings
+            api_res = fetch_calender_data(sg.user_settings_get_entry(
+                '-city-'), sg.user_settings_get_entry('-country-'), date=tomorrow)
+            current_times = api_res["data"][tomorrow.day - 1]["timings"]
+            # remove last month data after setting up the new month json file
+            os.remove(os.path.join(
+                DATA_DIR, f"{now.year}-{now.month}-{sg.user_settings_get_entry('-city-')}-{sg.user_settings_get_entry('-country-')}.json")
+            )
+        else:
+            current_times = api_res["data"][now.day]["timings"]
+
         ISHA_PASSED = True
 
     # loop through all prayer times to convert timing to datetime objects to be able to preform operations on them
     for k, v in current_times.items():
         # to adjust the day,month, year of the prayer datetime object
-        DAY = current_day+1 if ISHA_PASSED else current_day
-        t = v.split(" ")[0] + f" {DAY} {current_mon} {current_year}"
+        date = tomorrow if ISHA_PASSED else now
+        t = v.split(" ")[0] + f" {date.day} {date.month} {date.year}"
         current_times[k] = datetime.datetime.strptime(
             t, "%H:%M %d %m %Y")
 
         if k in FUROOD_NAMES:  # for debugging
-            print(k, current_times[k].strftime("%I:%M %p"))
+            print(k, current_times[k])
 
     for prayer, time in current_times.items():  # append upcoming prayers to list
         if now < time and prayer in FUROOD_NAMES:
@@ -280,7 +285,6 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-', font=GUI_FONT)],
                        [sg.Text("City", font=GUI_FONT), sg.Input(size=(15, 1), key="-CITY-", focus=True),
                        sg.Text("Country", font=GUI_FONT), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.HorizontalSeparator(color="dark brown")],
                        [sg.Button("Ok", size=(10, 1), font=GUI_FONT), sg.Push(), sg.Button("Cancel", size=(10, 1), font=GUI_FONT)]]
 
 
@@ -292,12 +296,13 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
         event, values = choose_location.read()
         if event == sg.WIN_CLOSED or event == "Cancel":
             exit()
-        if values['-CITY-'] and values['-COUNTRY-']:  # Run the athan api code
+        if values['-CITY-'].strip() and values['-COUNTRY-'].strip():  # Run the athan api code
 
             choose_location['-LOC TXT-'].update(
                 value='Fetching prayer times....')
             choose_location.refresh()
-            m_data = fetch_calender_data(values['-CITY-'], values['-COUNTRY-'])
+            m_data = fetch_calender_data(
+                values['-CITY-'], values['-COUNTRY-'], date=datetime.datetime.now())
 
             if m_data is None:  # if invalid city/country dont continue
                 choose_location['-LOC TXT-'].update(
@@ -312,7 +317,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                 sg.user_settings_set_entry('-country-',
                                            values['-COUNTRY-'])
 
-                SAVED_LOCATION = True if values['-SAVE_LOC_CHECK-'] else False
+                SAVED_LOCATION = values['-SAVE_LOC_CHECK-']
 
                 main_layout, UPCOMING_PRAYERS = set_main_layout_and_upcoming_prayers(
                     m_data)
@@ -323,10 +328,8 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
     choose_location.close()
 else:
     SAVED_LOCATION = True
-    saved_location_api_res = fetch_calender_data(
-        sg.user_settings_get_entry('-city-'),
-        sg.user_settings_get_entry('-country-')
-    )
+    saved_location_api_res = fetch_calender_data(sg.user_settings_get_entry(
+        '-city-'), sg.user_settings_get_entry('-country-'), date=datetime.datetime.now())
 
     main_layout, UPCOMING_PRAYERS = set_main_layout_and_upcoming_prayers(
         saved_location_api_res)
@@ -334,8 +337,8 @@ else:
 # ------------------------------------- Starts The GUI ------------------------------------- #
 
 try:
-    display_main_window(main_win_layout=main_layout,
-                        upcoming_prayers=UPCOMING_PRAYERS)
+    SAVED_LOCATION = display_main_window(
+        main_win_layout=main_layout, upcoming_prayers=UPCOMING_PRAYERS, save_loc_check=SAVED_LOCATION)
 except KeyboardInterrupt:
     sys.exit()
 
