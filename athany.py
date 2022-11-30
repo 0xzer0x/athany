@@ -28,7 +28,7 @@ AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
                     'Abdul-basit Abdul-samad', 'Mishari Alafasy', 'Islam Sobhy']
 
 
-GUI_FONT = "Calibri"
+GUI_FONT = "Arial 12"
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
 
@@ -83,7 +83,8 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check) -> bo
         time_d = upcoming_prayers[0][1] - now
 
         # update the main window with the next prayer and remaining time
-        window['-NEXT PRAYER-'].update(value=f'{upcoming_prayers[0][0]}')
+        window['-NEXT PRAYER-'].update(
+            value=f'{upcoming_prayers[0][0]}', font=GUI_FONT+" bold")
         window['-TIME_D-'].update(value=f'{time_d}')
 
         # update system tray tooltip also
