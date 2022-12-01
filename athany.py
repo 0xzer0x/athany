@@ -132,7 +132,7 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
             settings_layout = [
-                [sg.Text("Athan sound", key="-DISPLAYED_MSG-")],
+                [sg.Text("Athan sound", key="-DISPLAYED_MSG-", font=GUI_FONT)],
                 [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
                           default_value=current_athan), sg.Push(), sg.Button("Set athan")],
                 [sg.Button("Delete saved location data"),
@@ -140,7 +140,7 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             ]
 
             settings_window = sg.Window(
-                "Athany settings", settings_layout, icon=APP_ICON, font="Helvetica 11")
+                "Athany settings", settings_layout, icon=APP_ICON)
 
         # If 2nd window (settings window) is open, read values from it
         if win2_active:
@@ -274,8 +274,8 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
     initial_layout = [
         [sg.Text(font=GUI_FONT, key="-TODAY-"), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
          sg.Text(hijri_date_str, font=ARABIC_FONT, key="-TODAY_HIJRI-")],
-        [sg.Text("Next Prayer:", font=GUI_FONT), sg.Push(),
-            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Push(), sg.Text("in", font=GUI_FONT), sg.Push(), sg.Text(font=GUI_FONT, key="-TIME_D-")],
+        [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT), sg.HorizontalSeparator(),
+            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Text("in", font=GUI_FONT), sg.Text(font=GUI_FONT, key="-TIME_D-"), sg.HorizontalSeparator(), sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)],
         [sg.Text("Fajr: ", font=GUI_FONT), sg.Push(),
          sg.Text(f"{current_times['Fajr'].strftime('%I:%M %p')}", font=GUI_FONT, key="-FAJR TIME-")],
         [sg.Text("Dhuhr: ", font=GUI_FONT), sg.Push(),
