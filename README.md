@@ -34,8 +34,12 @@
 
 4. Extract the audio files from the zip file into the **Data** directory/folder
 
-5. Open a terminal, browse into the "athany-app" folder
+5. Download [_Arabic Typesetting_](https://arabicfonts.net/fonts/arabic-typesetting-regular) font, right click and install. **If you're on linux**, copy to /usr/share/fonts/
 
-6. run `pip install -r requirements.txt`
+6. **if you're on linux**, Download the font [_Segoe UI_](https://www.fontreach.com/segoe-ui-font-free-download/), install it
 
-7. run `python athany.py`
+7. Open a terminal, browse into the "athany-app" folder
+
+8. run `pip install -r requirements.txt`
+
+9. run `python athany.py`
