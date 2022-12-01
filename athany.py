@@ -24,11 +24,14 @@ if not sg.user_settings_get_entry('-athan_sound-'):
 UPCOMING_PRAYERS = []
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
+AR_NAMES = {"Fajr": "الفجر", "Dhuhr": "الظهر",
+            "Asr": "العصر", "Maghrib": "المغرب", "Isha": "العشاء"}
 AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
                     'Abdul-basit Abdul-samad', 'Mishari Alafasy', 'Islam Sobhy']
 
 
-GUI_FONT = "Arial 12"
+GUI_FONT = "Segoe\ UI 11"
+ARABIC_FONT = "Arabic\ Typesetting 17"
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
 
@@ -47,7 +50,7 @@ def play_selected_athan() -> simpleaudio.PlayObject:
 
 # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
 
-def display_main_window(main_win_layout, upcoming_prayers, save_loc_check) -> bool:
+def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, current_month_data) -> bool:
     """Displays the main application window, keeps running until window is closed\n
     Return:
         save_loc_check (bool) - boolean value whether the user wants to save his location data or not after application is closed
@@ -74,7 +77,10 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check) -> bo
 
             # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
             if len(upcoming_prayers) == 0:
-                upcoming_prayers = update_prayers_list()
+                new_data = get_main_layout_and_tomorrow_prayers(
+                    current_month_data)
+                current_month_data = new_data[2]
+                upcoming_prayers = new_data[1]
                 for prayer in upcoming_prayers:
                     window[f'-{prayer[0].upper()} TIME-'].update(
                         value=prayer[1].strftime("%I:%M %p"))
@@ -86,6 +92,11 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check) -> bo
         window['-NEXT PRAYER-'].update(
             value=f'{upcoming_prayers[0][0]}', font=GUI_FONT+" bold")
         window['-TIME_D-'].update(value=f'{time_d}')
+        # update the current dates
+        window['-TODAY_HIJRI-'].update(
+            value=get_hijri_date_from_json(now, api_res=current_month_data))
+        window['-TODAY-'].update(
+            value=now.date().strftime("%a %d %b %y"))
 
         # update system tray tooltip also
         application_tray.set_tooltip(
@@ -121,9 +132,9 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check) -> bo
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
             settings_layout = [
-                [sg.Text("Athan sound", key="-DISPLAYED_MSG-")],
+                [sg.Text("Athan sound", key="-DISPLAYED_MSG-", font=GUI_FONT)],
                 [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
-                          default_value=current_athan), sg.Push(), sg.Button("Set athan")],
+                          default_value=current_athan, font=GUI_FONT), sg.Push(), sg.Button("Set athan")],
                 [sg.Button("Delete saved location data"),
                  sg.Push(), sg.Button("Done")]
             ]
@@ -176,14 +187,6 @@ def start_system_tray(win: sg.Window):
 
 # ------------------------------------- Main Application logic ------------------------------------- #
 
-def update_prayers_list() -> list:
-    """function to update upcoming prayers after isha prayer"""
-    updated_list = set_main_layout_and_upcoming_prayers(fetch_calender_data(sg.user_settings_get_entry(
-        '-city-'), sg.user_settings_get_entry('-country-'), date=datetime.datetime.now()))[1]
-
-    return updated_list
-
-
 def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
     """ check if calender data for the city+country+month+year exists and fetch it if not
      Return:
@@ -210,17 +213,25 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
     return month_data
 
 
-def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
-    """ sets the prayer times window layout and sets the inital upcoming prayers on application startup
+def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
+    """ function to return arabic hijri date string to display in main window """
+    hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
+    return f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
+
+
+def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dict]:
+    """ sets the prayer times window layout and sets the inital upcoming prayers on application startup\n
         Arguments:
-            api_res (dict) - adhan api json response as a dictionary
+            api_res (dict) - adhan api month json response as a dictionary
         Return:
-            prayer_times_layout (list) - main window layout based on the timings fetched from api_res
-            UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed
+            initial_layout (list) - main window layout based on the timings fetched from api_res\n
+            UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed\n
+            api_res (dict) - the month api data or the new month api data
     """
     now = datetime.datetime.now()
     tomorrow = now+datetime.timedelta(days=1)
     current_times = api_res["data"][now.day-1]["timings"]
+    hijri_date_str = get_hijri_date_from_json(date=now, api_res=api_res)
 
     ISHA_OBJ = current_times['Isha'].split()
     ISHA_PASSED = False
@@ -258,9 +269,9 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
             UPCOMING_PRAYERS.append([prayer, time])
 
     # setting the main window layout with the inital prayer times
-    prayer_times_layout = [
-        [sg.Text("Current Date", font=GUI_FONT), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{now.date()}", font=GUI_FONT, key="-CURRENT_DATE-")],
+    initial_layout = [
+        [sg.Text(font=GUI_FONT, key="-TODAY-"), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
+         sg.Text(hijri_date_str, font=ARABIC_FONT, key="-TODAY_HIJRI-")],
         [sg.Text("Next Prayer:", font=GUI_FONT), sg.Push(),
             sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Push(), sg.Text("in", font=GUI_FONT), sg.Push(), sg.Text(font=GUI_FONT, key="-TIME_D-")],
         [sg.Text("Fajr: ", font=GUI_FONT), sg.Push(),
@@ -277,7 +288,7 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
         [sg.Button("Settings"), sg.Button("Stop athan"), sg.Push(),
             sg.Button("Minimize"), sg.Button("Exit")]
     ]
-    return prayer_times_layout, UPCOMING_PRAYERS
+    return (initial_layout, UPCOMING_PRAYERS, api_res)
 
 
 # ------------------------------------- Option To Choose Location If Not Saved Before ------------------------------------- #
@@ -285,8 +296,8 @@ def set_main_layout_and_upcoming_prayers(api_res: dict) -> tuple[list, list]:
 # define the layout for the 'choose location' window
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-', font=GUI_FONT)],
                        [sg.Text("City", font=GUI_FONT), sg.Input(size=(15, 1), key="-CITY-", focus=True),
-                       sg.Text("Country", font=GUI_FONT), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.Button("Ok", size=(10, 1), font=GUI_FONT), sg.Push(), sg.Button("Cancel", size=(10, 1), font=GUI_FONT)]]
+                       sg.Text("Country", font=GUI_FONT), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-', font=GUI_FONT)],
+                       [sg.Button("Ok", size=(10, 1), font=GUI_FONT), sg.Push(), sg.Button("Cancel", font=GUI_FONT)]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
@@ -296,7 +307,8 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
     while True:
         event, values = choose_location.read()
         if event == sg.WIN_CLOSED or event == "Cancel":
-            exit()
+            choose_location.close()
+            sys.exit()
         if values['-CITY-'].strip() and values['-COUNTRY-'].strip():  # Run the athan api code
 
             choose_location['-LOC TXT-'].update(
@@ -320,7 +332,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
 
                 SAVED_LOCATION = values['-SAVE_LOC_CHECK-']
 
-                main_layout, UPCOMING_PRAYERS = set_main_layout_and_upcoming_prayers(
+                start_data = get_main_layout_and_tomorrow_prayers(
                     m_data)
 
                 # close location choosing window, start main app window
@@ -329,17 +341,17 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
     choose_location.close()
 else:
     SAVED_LOCATION = True
-    saved_location_api_res = fetch_calender_data(sg.user_settings_get_entry(
+    m_data = fetch_calender_data(sg.user_settings_get_entry(
         '-city-'), sg.user_settings_get_entry('-country-'), date=datetime.datetime.now())
 
-    main_layout, UPCOMING_PRAYERS = set_main_layout_and_upcoming_prayers(
-        saved_location_api_res)
+    start_data = get_main_layout_and_tomorrow_prayers(
+        m_data)
 
 # ------------------------------------- Starts The GUI ------------------------------------- #
 
 try:
     SAVED_LOCATION = display_main_window(
-        main_win_layout=main_layout, upcoming_prayers=UPCOMING_PRAYERS, save_loc_check=SAVED_LOCATION)
+        main_win_layout=start_data[0], upcoming_prayers=start_data[1], save_loc_check=SAVED_LOCATION, current_month_data=start_data[2])
 except KeyboardInterrupt:
     sys.exit()
 
