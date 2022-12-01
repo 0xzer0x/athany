@@ -132,15 +132,15 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
             settings_layout = [
-                [sg.Text("Athan sound", key="-DISPLAYED_MSG-", font=GUI_FONT)],
+                [sg.Text("Athan sound", key="-DISPLAYED_MSG-")],
                 [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
-                          default_value=current_athan, font=GUI_FONT), sg.Push(), sg.Button("Set athan")],
+                          default_value=current_athan), sg.Push(), sg.Button("Set athan")],
                 [sg.Button("Delete saved location data"),
                  sg.Push(), sg.Button("Done")]
             ]
 
             settings_window = sg.Window(
-                "Athany settings", settings_layout, icon=APP_ICON)
+                "Athany settings", settings_layout, icon=APP_ICON, font="Helvetica 11")
 
         # If 2nd window (settings window) is open, read values from it
         if win2_active:
@@ -198,9 +198,11 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
         DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
 
     if not os.path.exists(json_month_file):
-        res = requests.get(
-            API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}", timeout=300)
-
+        try:
+            res = requests.get(
+                API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}", timeout=300)
+        except:
+            return "RequestError"
         if res.status_code != 200:  # if invalid city or country, return None instead of filename
             return None
 
@@ -294,15 +296,16 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
 # ------------------------------------- Option To Choose Location If Not Saved Before ------------------------------------- #
 
 # define the layout for the 'choose location' window
-location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-', font=GUI_FONT)],
-                       [sg.Text("City", font=GUI_FONT), sg.Input(size=(15, 1), key="-CITY-", focus=True),
-                       sg.Text("Country", font=GUI_FONT), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-', font=GUI_FONT)],
-                       [sg.Button("Ok", size=(10, 1), font=GUI_FONT), sg.Push(), sg.Button("Cancel", font=GUI_FONT)]]
+location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-')],
+                       [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
+                       sg.Text("Country"), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
+                       [sg.Button("Ok", size=(10, 1)), sg.Push(), sg.Button("Cancel")]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
     # If there are no saved settings, display the choose location window to set these values
-    choose_location = sg.Window("Athany", location_win_layout)
+    choose_location = sg.Window(
+        "Athany", location_win_layout, icon=APP_ICON, font="Helvetica 11")
 
     while True:
         event, values = choose_location.read()
@@ -319,11 +322,13 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
 
             if m_data is None:  # if invalid city/country dont continue
                 choose_location['-LOC TXT-'].update(
-                    value='Invalid city or country, please try again.')
+                    value='Invalid city or country, enter a valid location')
                 choose_location['-CITY-'].update(background_color='dark red')
                 choose_location['-COUNTRY-'].update(
                     background_color='dark red')
-
+            elif m_data == "RequestError":
+                choose_location["-LOC TXT-"].update(
+                    value="Please ensure you're connected to the internet and try again")
             else:
                 sg.user_settings_set_entry('-city-',
                                            values['-CITY-'])
