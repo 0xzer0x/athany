@@ -1,5 +1,5 @@
+.gitignore
 Data/*.json
 Data/*.mp3
 Data/*.wav
-Athans.zip
-.gitignore
+*.zip
