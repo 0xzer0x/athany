@@ -30,13 +30,13 @@
 
 ## Installation
 
-1. Install tkinter (`python-tk` on debian-based, `tk` on arch-based) using your package manager if you're on Linux, if you're on Windows you don't need this step.
+1. Install tkinter (`python-tk` on debian-based, `tk` on arch-based) using your package manager if you're on Linux, you may need to install extra dependencies like alsa sound libraries and `libappindicator3-1`.
 
 2. `git clone https://github.com/0xzer0x/athany-app` or download the code as zip from GitHub
 
 3. Download the _Athans.zip_ file from [here](https://drive.google.com/file/d/183jhzs7cQzxY6IqeTadjKf3b7ZLqbUa7/view?usp=sharing), extract the audio files from the zip file into the **Data** directory/folder
 
-4. Download & install required [Fonts](https://drive.google.com/file/d/1rTb6EHN6WFZjVJLiFJN3YbMqsdAqZtnf/view?usp=sharing) for application. Copy fonts to /usr/share/fonts/ if you're using linux
+4. Download & install required [Fonts](https://drive.google.com/file/d/15EewmO12DdEWfIdnbJJ9JeGXbBIvB2km/view?usp=sharing) for application. Copy fonts to /usr/share/fonts/ if you're using linux
 
 5. Open a terminal, browse into the "athany-app" folder
 
