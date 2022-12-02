@@ -7,7 +7,13 @@ import requests
 import simpleaudio
 import PySimpleGUI as sg
 from psgtray import SystemTray
-
+try:
+    from bidi.algorithm import get_display
+    import arabic_reshaper
+    MISSING_ARABIC_MODULES = False
+except ImportError:
+    MISSING_ARABIC_MODULES = True
+    print("[DEBUG] Couldn't load Arabic text modules, Ignore this error if using Windows")
 # ------------------------------------- Application Settings ------------------------------------- #
 DATA_DIR = os.path.join(
     os.path.abspath(__file__).split("athany.py")[0], 'Data'
@@ -31,7 +37,7 @@ AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
 
 
 GUI_FONT = "Segoe\ UI 11"
-ARABIC_FONT = "Arabic\ Typesetting 20"
+ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
 
@@ -218,7 +224,12 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
 def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
     """ function to return arabic hijri date string to display in main window """
     hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
-    return f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
+    text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
+    if not MISSING_ARABIC_MODULES:
+        arabic_text = get_display(arabic_reshaper.reshape(text))
+        return arabic_text
+    else:
+        return text
 
 
 def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dict]:
