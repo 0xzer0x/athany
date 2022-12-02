@@ -31,7 +31,7 @@ AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
 
 
 GUI_FONT = "Segoe\ UI 11"
-ARABIC_FONT = "Arabic\ Typesetting 17"
+ARABIC_FONT = "Arabic\ Typesetting 20"
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
 
@@ -272,7 +272,7 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
 
     # setting the main window layout with the inital prayer times
     initial_layout = [
-        [sg.Text(font=GUI_FONT, key="-TODAY-"), sg.Push(), sg.Text("~", font=GUI_FONT), sg.Push(),
+        [sg.Text(font=GUI_FONT+" bold", key="-TODAY-"), sg.Push(), sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 7"), sg.Push(),
          sg.Text(hijri_date_str, font=ARABIC_FONT, key="-TODAY_HIJRI-")],
         [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT), sg.HorizontalSeparator(),
             sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Text("in", font=GUI_FONT), sg.Text(font=GUI_FONT, key="-TIME_D-"), sg.HorizontalSeparator(), sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)],
