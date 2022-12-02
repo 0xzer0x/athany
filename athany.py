@@ -91,8 +91,8 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
 
             # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
             if len(upcoming_prayers) == 0:
-                new_data = get_main_layout_and_tomorrow_prayers(
-                    current_month_data)
+                new_data = get_main_layout_and_tomorrow_prayers(fetch_calender_data(
+                    sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), date=now))
                 current_month_data = new_data[2]
                 upcoming_prayers = new_data[1]
                 for prayer in upcoming_prayers:
@@ -290,6 +290,7 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
         if k in FUROOD_NAMES:  # for debugging
             print(k, current_times[k])
 
+    print("="*50)
     for prayer, time in current_times.items():  # append upcoming prayers to list
         if now < time and prayer in FUROOD_NAMES:
             UPCOMING_PRAYERS.append([prayer, time])
