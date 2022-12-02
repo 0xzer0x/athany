@@ -264,6 +264,11 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
         if tomorrow.day < now.day:  # SPECIAL CASE: if today is the last day in the month, fetch new month calender and adjust the timings
             api_res = fetch_calender_data(sg.user_settings_get_entry(
                 '-city-'), sg.user_settings_get_entry('-country-'), date=tomorrow)
+            if api_res == "RequestError":
+                sg.user_settings_delete_entry('-city-')
+                sg.user_settings_delete_entry('-country-')
+                sys.exit()
+
             current_times = api_res["data"][tomorrow.day - 1]["timings"]
             # remove last month data after setting up the new month json file
             os.remove(os.path.join(

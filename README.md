@@ -34,14 +34,12 @@
 
 2. `git clone https://github.com/0xzer0x/athany-app` or download the code as zip from GitHub
 
-3. Download the _Athans.zip_ file from [here](https://drive.google.com/file/d/1AKKsRSePFuPBuzRieIB8hZjAZ7ywzimc/view?usp=sharing)
+3. Download the _Athans.zip_ file from [here](https://drive.google.com/file/d/183jhzs7cQzxY6IqeTadjKf3b7ZLqbUa7/view?usp=sharing), extract the audio files from the zip file into the **Data** directory/folder
 
-4. Extract the audio files from the zip file into the **Data** directory/folder
+4. Download & install required [Fonts](https://drive.google.com/file/d/1rTb6EHN6WFZjVJLiFJN3YbMqsdAqZtnf/view?usp=sharing) for application. Copy fonts to /usr/share/fonts/ if you're using linux
 
-5. Download Required [Fonts](https://drive.google.com/file/d/1rTb6EHN6WFZjVJLiFJN3YbMqsdAqZtnf/view?usp=sharing) for application. Copy fonts to /usr/share/fonts/ if you're using linux
+5. Open a terminal, browse into the "athany-app" folder
 
-6. Open a terminal, browse into the "athany-app" folder
+6. run `pip install -r requirements.txt`
 
-7. run `pip install -r requirements.txt`
-
-8. run `python athany.py`
+7. run `python athany.py`
