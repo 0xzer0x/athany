@@ -38,7 +38,7 @@
 
 4. Extract the audio files from the zip file into the **Data** directory/folder
 
-5. **If you're on linux**, Download Required [Fonts](https://drive.google.com/file/d/1rTb6EHN6WFZjVJLiFJN3YbMqsdAqZtnf/view?usp=sharing) for application. Copy fonts to /usr/share/fonts/
+5. Download Required [Fonts](https://drive.google.com/file/d/1rTb6EHN6WFZjVJLiFJN3YbMqsdAqZtnf/view?usp=sharing) for application. Copy fonts to /usr/share/fonts/ if you're using linux
 
 6. Open a terminal, browse into the "athany-app" folder
 
