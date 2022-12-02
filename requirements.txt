@@ -2,3 +2,5 @@ PySimpleGUI
 psgtray
 requests
 simpleaudio
+python-bidi
+arabic-reshaper
