@@ -12,7 +12,7 @@
  
 ## Requirements
  
-- Python3 (tested on pyhon 3.10 & 3.11)
+- Python3 (tested on python 3.10 & 3.11)
 
 - `tk` tkinter package if you're on linux, install it using your package manager. If you can't find it, search how to install tkinter on your distro.
 
