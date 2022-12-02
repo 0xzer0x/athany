@@ -206,8 +206,8 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
      Return:
         month_data (dict) - api response json data dictionary
     """
-    cit = cit.lower()
-    count = count.lower()
+    cit = cit.lower().strip()
+    count = count.lower().strip()
     json_month_file = os.path.join(
         DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
 
