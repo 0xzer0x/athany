@@ -11,7 +11,9 @@ if sys.platform != "win32":
     try:
         from bidi.algorithm import get_display
         import arabic_reshaper
+        MISSING_ARABIC_MODULES = False
     except ImportError:
+        MISSING_ARABIC_MODULES = True
         print("[DEBUG] Couldn't load Arabic text modules, Install arabic text modules to display text correctly")
 
 # ------------------------------------- Application Settings ------------------------------------- #
@@ -226,7 +228,7 @@ def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
     """ function to return arabic hijri date string to display in main window """
     hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
     text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
-    if sys.platform != "win32":
+    if sys.platform != "win32" and not MISSING_ARABIC_MODULES:
         arabic_text = get_display(arabic_reshaper.reshape(text))
         return arabic_text
     else:
