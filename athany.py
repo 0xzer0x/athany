@@ -34,8 +34,13 @@ API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 AR_NAMES = {"Fajr": "الفجر", "Dhuhr": "الظهر",
             "Asr": "العصر", "Maghrib": "المغرب", "Isha": "العشاء"}
-AVAILABLE_ADHANS = ['Default', 'Alaqsa', 'Egypt', 'Makkah',
-                    'Abdul-basit Abdul-samad', 'Mishari Alafasy', 'Islam Sobhy']
+AVAILABLE_ADHANS = ['Default',
+                    'Alaqsa', 'Alaqsa (short)',
+                    'Egypt', 'Egypt (short)',
+                    'Makkah', 'Makkah (short)',
+                    'Abdul-basit Abdul-samad', 'Abdul-basit Abdul-samad (short)',
+                    'Mishari Alafasy', 'Mishari Alafasy (short)',
+                    'Islam Sobhy', 'Islam Sobhy (short)']
 
 
 GUI_FONT = "Segoe\ UI 11"
