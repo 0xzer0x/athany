@@ -96,6 +96,7 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                     sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), date=now))
                 current_month_data = new_data[2]
                 upcoming_prayers = new_data[1]
+                del new_data
                 for prayer in upcoming_prayers:
                     window[f'-{prayer[0].upper()} TIME-'].update(
                         value=prayer[1].strftime("%I:%M %p"))
@@ -151,7 +152,7 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                          key="-DISPLAYED_MSG-", font=GUI_FONT)],
                 [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
                           default_value=current_athan), sg.Push(), sg.Button("Set athan", font=BUTTON_FONT)],
-                [sg.Button("Delete saved location data", font=BUTTON_FONT),
+                [sg.Button("Reset location settings", font=BUTTON_FONT),
                  sg.Push(), sg.Button("Done", font=BUTTON_FONT)]
             ]
 
@@ -178,11 +179,12 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                     athan_play_obj.stop()
                 athan_play_obj = play_selected_athan()
 
-            elif event2 == "Delete saved location data" and save_loc_check:
-                print("[DEBUG] Location data will be removed on exit")
-                save_loc_check = False
+            elif event2 == "Reset location settings":
                 settings_window['-DISPLAYED_MSG-'].update(
-                    value="Location settings will be deleted on exit")
+                    value="Location settings were reset, application restart required")
+                if save_loc_check:
+                    save_loc_check = False
+                    print("[DEBUG] Location data will be removed on exit")
     # close application on exit
     application_tray.close()
     window.close()
