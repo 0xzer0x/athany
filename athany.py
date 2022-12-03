@@ -44,6 +44,7 @@ AVAILABLE_ADHANS = ['Default',
 
 
 GUI_FONT = "Segoe\ UI 11"
+BUTTON_FONT = "Helvetica 10"
 ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
 
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
@@ -146,15 +147,16 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
             settings_layout = [
-                [sg.Text("Athan sound", key="-DISPLAYED_MSG-", font=GUI_FONT)],
+                [sg.Text(f"Current Athan: {current_athan}",
+                         key="-DISPLAYED_MSG-", font=GUI_FONT)],
                 [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
-                          default_value=current_athan), sg.Push(), sg.Button("Set athan")],
-                [sg.Button("Delete saved location data"),
-                 sg.Push(), sg.Button("Done")]
+                          default_value=current_athan), sg.Push(), sg.Button("Set athan", font=BUTTON_FONT)],
+                [sg.Button("Delete saved location data", font=BUTTON_FONT),
+                 sg.Push(), sg.Button("Done", font=BUTTON_FONT)]
             ]
 
             settings_window = sg.Window(
-                "Athany settings", settings_layout, icon=APP_ICON)
+                "Athany settings", settings_layout, icon=APP_ICON, keep_on_top=True)
 
         # If 2nd window (settings window) is open, read values from it
         if win2_active:
@@ -167,7 +169,7 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                     '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.wav")
 
                 settings_window['-DISPLAYED_MSG-'].update(
-                    value=f"Athan was successfully set to {values2[0]}")
+                    value=f"Current Athan: {values2[0]}")
 
                 # Debugging
                 print(f"[DEBUG] You chose {values2[0]} athan")
@@ -176,14 +178,16 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                     athan_play_obj.stop()
                 athan_play_obj = play_selected_athan()
 
-            elif event2 == "Delete saved location data":
-                print("[DEBUG] Deleting saved location data...")
+            elif event2 == "Delete saved location data" and save_loc_check:
+                print("[DEBUG] Location data will be removed on exit")
                 save_loc_check = False
                 settings_window['-DISPLAYED_MSG-'].update(
                     value="Location settings will be deleted on exit")
     # close application on exit
     application_tray.close()
     window.close()
+    del window
+    del application_tray
     return save_loc_check
 
 
@@ -287,34 +291,37 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
         current_times[k] = datetime.datetime.strptime(
             t, "%H:%M %d %m %Y")
 
-        if k in FUROOD_NAMES:  # for debugging
-            print(k, current_times[k])
+    print("="*50)
+    initial_layout = [
+        [sg.Text(font=GUI_FONT+" bold", key="-TODAY-"),
+         sg.Push(),
+         sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"),
+         sg.Push(),
+         sg.Text(hijri_date_str, font=ARABIC_FONT, key="-TODAY_HIJRI-")],
+        [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT),
+            sg.HorizontalSeparator(),
+            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"),
+            sg.Text("in", font=GUI_FONT),
+            sg.Text(font=GUI_FONT, key="-TIME_D-"),
+            sg.HorizontalSeparator(),
+            sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)]
+    ]
+    for prayer, time in current_times.items():  # append upcoming prayers to list
+        if prayer in FUROOD_NAMES:  # setting the main window layout with the inital prayer times
+            initial_layout.append([sg.Text(f"{prayer}:", font=GUI_FONT), sg.Push(),
+                                   sg.Text(f"{time.strftime('%I:%M %p')}", font=GUI_FONT, key=f"-{prayer.upper()} TIME-")])
+
+            print(prayer, time)  # Debugging
+            if now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
+                UPCOMING_PRAYERS.append([prayer, time])
+
+    # the rest of the main window layout
+    initial_layout += [[sg.HorizontalSeparator(color="dark brown")],
+                       [sg.Button("Settings", font=BUTTON_FONT), sg.Button("Stop athan", font=BUTTON_FONT), sg.Push(),
+                       sg.Button("Minimize", font=BUTTON_FONT), sg.Button("Exit", font=BUTTON_FONT)]]
 
     print("="*50)
-    for prayer, time in current_times.items():  # append upcoming prayers to list
-        if now < time and prayer in FUROOD_NAMES:
-            UPCOMING_PRAYERS.append([prayer, time])
 
-    # setting the main window layout with the inital prayer times
-    initial_layout = [
-        [sg.Text(font=GUI_FONT+" bold", key="-TODAY-"), sg.Push(), sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"), sg.Push(),
-         sg.Text(hijri_date_str, font=ARABIC_FONT, key="-TODAY_HIJRI-")],
-        [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT), sg.HorizontalSeparator(),
-            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"), sg.Text("in", font=GUI_FONT), sg.Text(font=GUI_FONT, key="-TIME_D-"), sg.HorizontalSeparator(), sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)],
-        [sg.Text("Fajr: ", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{current_times['Fajr'].strftime('%I:%M %p')}", font=GUI_FONT, key="-FAJR TIME-")],
-        [sg.Text("Dhuhr: ", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{current_times['Dhuhr'].strftime('%I:%M %p')}", font=GUI_FONT, key="-DHUHR TIME-")],
-        [sg.Text("Asr: ", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{current_times['Asr'].strftime('%I:%M %p')}", font=GUI_FONT, key="-ASR TIME-")],
-        [sg.Text("Maghrib: ", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{current_times['Maghrib'].strftime('%I:%M %p')}", font=GUI_FONT, key="-MAGHRIB TIME-")],
-        [sg.Text("Isha: ", font=GUI_FONT), sg.Push(),
-         sg.Text(f"{current_times['Isha'].strftime('%I:%M %p')}", font=GUI_FONT, key="-ISHA TIME-")],
-        [sg.HorizontalSeparator(color="dark brown")],
-        [sg.Button("Settings"), sg.Button("Stop athan"), sg.Push(),
-            sg.Button("Minimize"), sg.Button("Exit")]
-    ]
     return (initial_layout, UPCOMING_PRAYERS, api_res)
 
 
@@ -322,15 +329,15 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
 
 # define the layout for the 'choose location' window
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-')],
-                       [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
-                       sg.Text("Country"), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.Button("Ok", size=(10, 1)), sg.Push(), sg.Button("Cancel")]]
+                       [sg.Text("City"), sg.Input(size=(20, 1), key="-CITY-", focus=True),
+                       sg.Text("Country"), sg.Input(size=(20, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
+                       [sg.Button("Ok", size=(10, 1), font=BUTTON_FONT), sg.Push(), sg.Button("Cancel", font=BUTTON_FONT)]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
     # If there are no saved settings, display the choose location window to set these values
     choose_location = sg.Window(
-        "Athany", location_win_layout, icon=APP_ICON, font="Helvetica 11")
+        "Athany", location_win_layout, icon=APP_ICON, font="Segoe\ UI 11")
 
     while True:
         event, values = choose_location.read()
@@ -369,6 +376,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                 break
 
     choose_location.close()
+    del choose_location  # tkinter cleanup
 else:
     SAVED_LOCATION = True
     m_data = fetch_calender_data(sg.user_settings_get_entry(
