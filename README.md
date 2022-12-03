@@ -14,6 +14,8 @@
  
 - Python3 (tested on python 3.10 & 3.11)
 
+- Internet connection is required **before the Isha prayer of the last day in each month** in order to fetch the new month calender, otherwise it operates offline
+
 - `tk` tkinter package if you're on linux, install it using your package manager. If you can't find it, search how to install tkinter on your distro.
 
 - `PySimpleGUI` python module
