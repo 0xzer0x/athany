@@ -32,8 +32,6 @@ if not sg.user_settings_get_entry('-athan_sound-'):
 UPCOMING_PRAYERS = []
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
-AR_NAMES = {"Fajr": "الفجر", "Dhuhr": "الظهر",
-            "Asr": "العصر", "Maghrib": "المغرب", "Isha": "العشاء"}
 AVAILABLE_ADHANS = ['Default',
                     'Alaqsa', 'Alaqsa (short)',
                     'Egypt', 'Egypt (short)',
@@ -54,6 +52,8 @@ with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode='rb') as toff:
 with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
     TOGGLE_ON_B64 = ton.read()
 
+# ------------------------------------- Main Application logic ------------------------------------- #
+
 
 def play_selected_athan() -> simpleaudio.PlayObject:
     """ fetches current settings for athan and plays the corresponding athan
@@ -67,7 +67,138 @@ def play_selected_athan() -> simpleaudio.PlayObject:
     return play_obj
 
 
+def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
+    """ check if calender data for the city+country+month+year exists and fetch it if not
+     Return:
+        month_data (dict) - api response json data dictionary
+    """
+    cit = cit.lower().strip()
+    count = count.lower().strip()
+    json_month_file = os.path.join(
+        DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
+
+    if not os.path.exists(json_month_file):
+        try:
+            res = requests.get(
+                API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}", timeout=300)
+        except:
+            return "RequestError"
+        if res.status_code != 200:  # if invalid city or country, return None instead of filename
+            return None
+
+        with open(json_month_file, mode="w", encoding='utf-8') as f:
+            f.write(res.text)
+
+    with open(json_month_file, encoding='utf-8') as month_prayers:
+        month_data = json.load(month_prayers)
+
+    return month_data
+
+
+def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
+    """ function to return arabic hijri date string to display in main window """
+    hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
+    text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
+    if sys.platform != "win32" and not MISSING_ARABIC_MODULES:
+        arabic_text = get_display(arabic_reshaper.reshape(text))
+        return arabic_text
+    else:
+        return text
+
+
+def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dict]:
+    """ sets the prayer times window layout and sets the inital upcoming prayers on application startup\n
+        Arguments:
+            api_res (dict) - adhan api month json response as a dictionary
+        Return:
+            initial_layout (list) - main window layout based on the timings fetched from api_res\n
+            UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed\n
+            api_res (dict) - the month api data or the new month api data\n
+    """
+    now = datetime.datetime.now()
+    tomorrow = now+datetime.timedelta(days=1)
+    current_times = api_res["data"][now.day-1]["timings"]
+
+    ISHA_OBJ = current_times['Isha'].split()
+    ISHA_PASSED = False
+    # Check if Isha passed as to get the following day timings
+    # Prayer times change after Isha athan to the times of the following day
+    # if NOW is after current Isha time
+    if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {now.day} {now.month} {now.year}", "%H:%M %d %m %Y"):
+        # replace all prayer times with the next day prayers
+        if tomorrow.day < now.day:  # SPECIAL CASE: if today is the last day in the month, fetch new month calender and adjust the timings
+            api_res = fetch_calender_data(sg.user_settings_get_entry(
+                '-city-'), sg.user_settings_get_entry('-country-'), date=tomorrow)
+            if api_res == "RequestError":
+                sg.user_settings_delete_entry('-city-')
+                sg.user_settings_delete_entry('-country-')
+                sys.exit()
+
+            current_times = api_res["data"][tomorrow.day - 1]["timings"]
+            # remove last month data after setting up the new month json file
+            os.remove(os.path.join(
+                DATA_DIR, f"{now.year}-{now.month}-{sg.user_settings_get_entry('-city-')}-{sg.user_settings_get_entry('-country-')}.json")
+            )
+        else:
+            current_times = api_res["data"][now.day]["timings"]
+
+        ISHA_PASSED = True
+
+    # loop through all prayer times to convert timing to datetime objects to be able to preform operations on them
+    for k, v in current_times.items():
+        # to adjust the day,month, year of the prayer datetime object
+        date = tomorrow if ISHA_PASSED else now
+        t = v.split(" ")[0] + f" {date.day} {date.month} {date.year}"
+        current_times[k] = datetime.datetime.strptime(
+            t, "%H:%M %d %m %Y")
+
+    print("="*50)
+    initial_layout = [
+        [sg.Text(font=GUI_FONT+" bold", key="-TODAY-"),
+         sg.Push(),
+         sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"),
+         sg.Push(),
+         sg.Text(font=ARABIC_FONT, key="-TODAY_HIJRI-")],
+        [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT),
+            sg.HorizontalSeparator(),
+            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"),
+            sg.Text("in", font=GUI_FONT),
+            sg.Text(font=GUI_FONT, key="-TIME_D-"),
+            sg.HorizontalSeparator(),
+            sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)]
+    ]
+    for prayer, time in current_times.items():  # append upcoming prayers to list
+        if prayer in FUROOD_NAMES:  # setting the main window layout with the inital prayer times
+            initial_layout.append([sg.Text(f"{prayer}:", font=GUI_FONT), sg.Push(),
+                                   sg.Text(f"{time.strftime('%I:%M %p')}", font=GUI_FONT, key=f"-{prayer.upper()} TIME-")])
+
+            print(prayer, time)  # Debugging
+            if now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
+                UPCOMING_PRAYERS.append([prayer, time])
+
+    # the rest of the main window layout
+    initial_layout += [[sg.HorizontalSeparator(color="dark brown")],
+                       [sg.Button("Settings", font=BUTTON_FONT), sg.Button("Stop athan", font=BUTTON_FONT), sg.Push(),
+                       sg.Button("Minimize", font=BUTTON_FONT), sg.Button("Exit", font=BUTTON_FONT)]]
+
+    print("="*50)
+
+    return (initial_layout, UPCOMING_PRAYERS, api_res)
+
+
 # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
+
+def start_system_tray(win: sg.Window):
+    """starts the SystemTray object and instantiates it's menu and tooltip"""
+    menu = ['', ['Show Window', 'Hide Window', '---', 'Stop athan',
+                 'Settings', 'Exit']]
+    tooltip = 'Next prayer X in Y'
+    tray = SystemTray(menu=menu, tooltip=tooltip,
+                      window=win, icon=APP_ICON)
+    tray.show_message(
+        title="Athany", message="Press 'Minimize' to minimize application to system tray")
+    return tray
+
 
 def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, current_month_data) -> bool:
     """Displays the main application window, keeps running until window is closed\n
@@ -200,141 +331,8 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
     del application_tray
     return save_loc_check
 
-
-def start_system_tray(win: sg.Window):
-    """starts the SystemTray object and instantiates it's menu and tooltip"""
-    menu = ['', ['Show Window', 'Hide Window', '---', 'Stop athan',
-                 'Settings', 'Exit']]
-    tooltip = 'Next prayer X in Y'
-    tray = SystemTray(menu=menu, tooltip=tooltip,
-                      window=win, icon=APP_ICON)
-    tray.show_message(
-        title="Athany", message="Press 'Minimize' to minimize application to system tray")
-    return tray
-
-
-# ------------------------------------- Main Application logic ------------------------------------- #
-
-def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
-    """ check if calender data for the city+country+month+year exists and fetch it if not
-     Return:
-        month_data (dict) - api response json data dictionary
-    """
-    cit = cit.lower().strip()
-    count = count.lower().strip()
-    json_month_file = os.path.join(
-        DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
-
-    if not os.path.exists(json_month_file):
-        try:
-            res = requests.get(
-                API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}", timeout=300)
-        except:
-            return "RequestError"
-        if res.status_code != 200:  # if invalid city or country, return None instead of filename
-            return None
-
-        with open(json_month_file, mode="w", encoding='utf-8') as f:
-            f.write(res.text)
-
-    with open(json_month_file, encoding='utf-8') as month_prayers:
-        month_data = json.load(month_prayers)
-
-    return month_data
-
-
-def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
-    """ function to return arabic hijri date string to display in main window """
-    hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
-    text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
-    if sys.platform != "win32" and not MISSING_ARABIC_MODULES:
-        arabic_text = get_display(arabic_reshaper.reshape(text))
-        return arabic_text
-    else:
-        return text
-
-
-def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dict]:
-    """ sets the prayer times window layout and sets the inital upcoming prayers on application startup\n
-        Arguments:
-            api_res (dict) - adhan api month json response as a dictionary
-        Return:
-            initial_layout (list) - main window layout based on the timings fetched from api_res\n
-            UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed\n
-            api_res (dict) - the month api data or the new month api data\n
-    """
-    now = datetime.datetime.now()
-    tomorrow = now+datetime.timedelta(days=1)
-    current_times = api_res["data"][now.day-1]["timings"]
-
-    ISHA_OBJ = current_times['Isha'].split()
-    ISHA_PASSED = False
-    # Check if Isha passed as to get the following day timings
-    # Prayer times change after Isha athan to the times of the following day
-    # if NOW is after current Isha time
-    if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {now.day} {now.month} {now.year}", "%H:%M %d %m %Y"):
-        # replace all prayer times with the next day prayers
-        if tomorrow.day < now.day:  # SPECIAL CASE: if today is the last day in the month, fetch new month calender and adjust the timings
-            api_res = fetch_calender_data(sg.user_settings_get_entry(
-                '-city-'), sg.user_settings_get_entry('-country-'), date=tomorrow)
-            if api_res == "RequestError":
-                sg.user_settings_delete_entry('-city-')
-                sg.user_settings_delete_entry('-country-')
-                sys.exit()
-
-            current_times = api_res["data"][tomorrow.day - 1]["timings"]
-            # remove last month data after setting up the new month json file
-            os.remove(os.path.join(
-                DATA_DIR, f"{now.year}-{now.month}-{sg.user_settings_get_entry('-city-')}-{sg.user_settings_get_entry('-country-')}.json")
-            )
-        else:
-            current_times = api_res["data"][now.day]["timings"]
-
-        ISHA_PASSED = True
-
-    # loop through all prayer times to convert timing to datetime objects to be able to preform operations on them
-    for k, v in current_times.items():
-        # to adjust the day,month, year of the prayer datetime object
-        date = tomorrow if ISHA_PASSED else now
-        t = v.split(" ")[0] + f" {date.day} {date.month} {date.year}"
-        current_times[k] = datetime.datetime.strptime(
-            t, "%H:%M %d %m %Y")
-
-    print("="*50)
-    initial_layout = [
-        [sg.Text(font=GUI_FONT+" bold", key="-TODAY-"),
-         sg.Push(),
-         sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"),
-         sg.Push(),
-         sg.Text(font=ARABIC_FONT, key="-TODAY_HIJRI-")],
-        [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT),
-            sg.HorizontalSeparator(),
-            sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"),
-            sg.Text("in", font=GUI_FONT),
-            sg.Text(font=GUI_FONT, key="-TIME_D-"),
-            sg.HorizontalSeparator(),
-            sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)]
-    ]
-    for prayer, time in current_times.items():  # append upcoming prayers to list
-        if prayer in FUROOD_NAMES:  # setting the main window layout with the inital prayer times
-            initial_layout.append([sg.Text(f"{prayer}:", font=GUI_FONT), sg.Push(),
-                                   sg.Text(f"{time.strftime('%I:%M %p')}", font=GUI_FONT, key=f"-{prayer.upper()} TIME-")])
-
-            print(prayer, time)  # Debugging
-            if now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
-                UPCOMING_PRAYERS.append([prayer, time])
-
-    # the rest of the main window layout
-    initial_layout += [[sg.HorizontalSeparator(color="dark brown")],
-                       [sg.Button("Settings", font=BUTTON_FONT), sg.Button("Stop athan", font=BUTTON_FONT), sg.Push(),
-                       sg.Button("Minimize", font=BUTTON_FONT), sg.Button("Exit", font=BUTTON_FONT)]]
-
-    print("="*50)
-
-    return (initial_layout, UPCOMING_PRAYERS, api_res)
-
-
 # ------------------------------------- Option To Choose Location If Not Saved Before ------------------------------------- #
+
 
 # define the layout for the 'choose location' window
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-')],
