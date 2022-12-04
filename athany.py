@@ -80,7 +80,7 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
     if not os.path.exists(json_month_file):
         try:
             res = requests.get(
-                API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}", timeout=300)
+                API_ENDPOINT+f"?city={cit}&country={count}&month={date.month}&year={date.year}", timeout=300)
         except:
             return "RequestError"
         if res.status_code != 200:  # if invalid city or country, return None instead of filename
@@ -154,11 +154,11 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
 
     print("="*50)
     initial_layout = [
-        [sg.Text(font=GUI_FONT+" bold", key="-TODAY-"),
+        [sg.Text(key="-TODAY-", font=GUI_FONT+" bold"),
          sg.Push(),
          sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"),
          sg.Push(),
-         sg.Text(font=ARABIC_FONT, key="-TODAY_HIJRI-")],
+         sg.Text(key="-TODAY_HIJRI-", font=ARABIC_FONT)],
         [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT),
             sg.HorizontalSeparator(),
             sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"),
