@@ -49,6 +49,10 @@ ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesettin
 
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
+with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode='rb') as toff:
+    TOGGLE_OFF_B64 = toff.read()
+with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
+    TOGGLE_ON_B64 = ton.read()
 
 
 def play_selected_athan() -> simpleaudio.PlayObject:
@@ -94,8 +98,8 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             if len(upcoming_prayers) == 0:
                 new_data = get_main_layout_and_tomorrow_prayers(fetch_calender_data(
                     sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), date=now))
-                current_month_data = new_data[2]
                 upcoming_prayers = new_data[1]
+                current_month_data = new_data[2]
                 del new_data
                 for prayer in upcoming_prayers:
                     window[f'-{prayer[0].upper()} TIME-'].update(
@@ -109,10 +113,12 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             value=f'{upcoming_prayers[0][0]}', font=GUI_FONT+" bold")
         window['-TIME_D-'].update(value=f'{time_d}')
         # update the current dates
-        window['-TODAY_HIJRI-'].update(
-            value=get_hijri_date_from_json(now, api_res=current_month_data))
         window['-TODAY-'].update(
             value=now.date().strftime("%a %d %b %y"))
+
+        if now.month == upcoming_prayers[0][1].month:
+            window['-TODAY_HIJRI-'].update(
+                value=get_hijri_date_from_json(now, api_res=current_month_data))
 
         # update system tray tooltip also
         application_tray.set_tooltip(
@@ -147,23 +153,27 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             win2_active = True
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
-            settings_layout = [
-                [sg.Text(f"Current Athan: {current_athan}",
-                         key="-DISPLAYED_MSG-", font=GUI_FONT)],
-                [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True,
-                          default_value=current_athan), sg.Push(), sg.Button("Set athan", font=BUTTON_FONT)],
-                [sg.Button("Reset location settings", font=BUTTON_FONT),
-                 sg.Push(), sg.Button("Done", font=BUTTON_FONT)]
-            ]
+            settings_layout = [[sg.Text(f"Current Athan: {current_athan}", key="-DISPLAYED_MSG-")],
+                               [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True, default_value=current_athan, font=BUTTON_FONT),
+                               sg.Push(), sg.Button("Set athan", font=BUTTON_FONT)],
+                               [sg.Button(image_data=TOGGLE_ON_B64 if save_loc_check else TOGGLE_OFF_B64,
+                                          key='-TOGGLE-GRAPHIC-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                          border_width=0, metadata=save_loc_check),
+                                sg.Text(
+                                    f"Save location ({sg.user_settings_get_entry('-city-')}, {sg.user_settings_get_entry('-country-')})"),
+                                sg.Push(),
+                                sg.Button("Done", font=BUTTON_FONT)]
+                               ]
 
             settings_window = sg.Window(
-                "Athany settings", settings_layout, icon=APP_ICON, keep_on_top=True)
+                "Athany settings", settings_layout, icon=APP_ICON, font=GUI_FONT, keep_on_top=True)
 
         # If 2nd window (settings window) is open, read values from it
         if win2_active:
             event2, values2 = settings_window.read(timeout=100)
             if event2 in (sg.WIN_CLOSED, "Done"):
                 win2_active = False
+                save_loc_check = settings_window['-TOGGLE-GRAPHIC-'].metadata
                 settings_window.close()
             elif event2 == "Set athan" and values2[0] in AVAILABLE_ADHANS:
                 sg.user_settings_set_entry(
@@ -179,12 +189,10 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                     athan_play_obj.stop()
                 athan_play_obj = play_selected_athan()
 
-            elif event2 == "Reset location settings":
-                settings_window['-DISPLAYED_MSG-'].update(
-                    value="Location settings were reset, application restart required")
-                if save_loc_check:
-                    save_loc_check = False
-                    print("[DEBUG] Location data will be removed on exit")
+            elif event2 == "-TOGGLE-GRAPHIC-":
+                settings_window['-TOGGLE-GRAPHIC-'].metadata = not settings_window['-TOGGLE-GRAPHIC-'].metadata
+                settings_window['-TOGGLE-GRAPHIC-'].update(
+                    image_data=TOGGLE_ON_B64 if settings_window['-TOGGLE-GRAPHIC-'].metadata else TOGGLE_OFF_B64)
     # close application on exit
     application_tray.close()
     window.close()
@@ -253,12 +261,11 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
         Return:
             initial_layout (list) - main window layout based on the timings fetched from api_res\n
             UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed\n
-            api_res (dict) - the month api data or the new month api data
+            api_res (dict) - the month api data or the new month api data\n
     """
     now = datetime.datetime.now()
     tomorrow = now+datetime.timedelta(days=1)
     current_times = api_res["data"][now.day-1]["timings"]
-    hijri_date_str = get_hijri_date_from_json(date=now, api_res=api_res)
 
     ISHA_OBJ = current_times['Isha'].split()
     ISHA_PASSED = False
@@ -299,7 +306,7 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
          sg.Push(),
          sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"),
          sg.Push(),
-         sg.Text(hijri_date_str, font=ARABIC_FONT, key="-TODAY_HIJRI-")],
+         sg.Text(font=ARABIC_FONT, key="-TODAY_HIJRI-")],
         [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT),
             sg.HorizontalSeparator(),
             sg.Text(font=GUI_FONT, key="-NEXT PRAYER-"),
