@@ -1,12 +1,13 @@
 # Athany: a python application to remind you of your purpose
 
+
 <br>
 
 ### قال تعالى: {وَمَا خَلَقْتُ الْجِنَّ وَالْإِنسَ إِلَّا لِيَعْبُدُونِ (56)} \[الذاريات]
 
 <br>
  
-#### Athany is a python program for windows and linux that fetches the times for the five mandatory muslim prayers, tells you the time remaining until the next prayer and plays the athan sound if the prayer time comes.
+#### Athany is a lightweight python program for windows and linux that fetches the times for the five mandatory muslim prayers, tells you the time remaining until the next prayer, and plays the athan sound when the prayer time comes.
  
 <br>
  
