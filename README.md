@@ -37,9 +37,9 @@
 
 2. `git clone https://github.com/0xzer0x/athany-app` or download the code as zip from GitHub
 
-3. Download the [Athans.zip](https://github.com/0xzer0x/athany-app/releases/download/latest/Athans.zip) file, extract the audio files from the zip file into the **Data** directory/folder
+3. Download the [Athans.zip](https://github.com/0xzer0x/athany-app/releases/latest/download/Athans.zip) file, extract the audio files from the zip file into the **Data** directory/folder
 
-4. Download & install required [Fonts](https://github.com/0xzer0x/athany-app/releases/download/latest/fonts.zip) for application. Copy fonts to /usr/share/fonts/ if you're using linux
+4. Download & install required [Fonts](https://github.com/0xzer0x/athany-app/releases/latest/download/fonts.zip) for application. Copy fonts to /usr/share/fonts/ if you're using linux
 
 5. Open a terminal, browse into the "athany-app" folder
 
