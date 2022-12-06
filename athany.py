@@ -211,6 +211,7 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
     application_tray = start_system_tray(win=window)
     win2_active = False
     athan_play_obj = None
+    end_of_month_hijri = None
     while True:
         now = datetime.datetime.now().replace(microsecond=0)
 
@@ -248,9 +249,14 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             value=now.date().strftime("%a %d %b %y"))
 
         if now.month == upcoming_prayers[0][1].month:
+            end_of_month_hijri = None
             window['-TODAY_HIJRI-'].update(
                 value=get_hijri_date_from_json(now, api_res=current_month_data))
-
+        elif end_of_month_hijri:
+            window['-TODAY_HIJRI-'].update(value=end_of_month_hijri)
+        else:
+            end_of_month_hijri = get_hijri_date_from_json(now, api_res=fetch_calender_data(
+                sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), now))
         # update system tray tooltip also
         application_tray.set_tooltip(
             f"Next prayer: {upcoming_prayers[0][0]} in {time_d}")
