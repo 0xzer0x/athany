@@ -1,5 +1,4 @@
-.gitignore
-Data/*.json
-Data/*.mp3
-Data/*.wav
+Data/*
+!Data/*.dat
 *.zip
+.gitignore

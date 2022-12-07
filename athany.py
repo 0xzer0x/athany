@@ -17,9 +17,8 @@ if sys.platform != "win32":
         print("[DEBUG] Couldn't load Arabic text modules, Install arabic text modules to display text correctly")
 
 # ------------------------------------- Application Settings ------------------------------------- #
-DATA_DIR = os.path.join(
-    os.path.abspath(__file__).split("athany.py")[0], 'Data'
-)
+DATA_DIR = os.path.join(os.path.abspath(__file__).split("athany.py")[0],
+                        'Data')
 
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
@@ -28,8 +27,12 @@ sg.theme("DarkAmber")
 sg.user_settings_filename(filename='athany-config.json')
 if not sg.user_settings_get_entry('-athan_sound-'):
     sg.user_settings_set_entry('-athan_sound-', value='Default.wav')
+if not sg.user_settings_get_entry('-mute-athan-'):
+    sg.user_settings_set_entry('-mute-athan-', value=False)
+
 
 UPCOMING_PRAYERS = []
+save_loc_check = False
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 AVAILABLE_ADHANS = ['Default',
@@ -44,6 +47,7 @@ AVAILABLE_ADHANS = ['Default',
 GUI_FONT = "Segoe\ UI 11"
 BUTTON_FONT = "Helvetica 10"
 ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
+
 
 with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
@@ -72,8 +76,6 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
      Return:
         month_data (dict) - api response json data dictionary
     """
-    cit = cit.lower().strip()
-    count = count.lower().strip()
     json_month_file = os.path.join(
         DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
 
@@ -106,18 +108,18 @@ def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
         return text
 
 
-def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dict]:
+def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
     """ sets the prayer times window layout and sets the inital upcoming prayers on application startup\n
         Arguments:
             api_res (dict) - adhan api month json response as a dictionary
         Return:
             initial_layout (list) - main window layout based on the timings fetched from api_res\n
-            UPCOMING_PRAYERS (list) -  list of upcoming prayers until isha or all prayers of next day if isha passed\n
             api_res (dict) - the month api data or the new month api data\n
     """
     now = datetime.datetime.now()
     tomorrow = now+datetime.timedelta(days=1)
     current_times = api_res["data"][now.day-1]["timings"]
+    global UPCOMING_PRAYERS
 
     ISHA_OBJ = current_times['Isha'].split()
     ISHA_PASSED = False
@@ -152,11 +154,11 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
         current_times[k] = datetime.datetime.strptime(
             t, "%H:%M %d %m %Y")
 
-    print("="*50)
+    print(" DEBUG ".center(50, "="))
     initial_layout = [
         [sg.Text(key="-TODAY-", font=GUI_FONT+" bold"),
          sg.Push(),
-         sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 5"),
+         sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 6"),
          sg.Push(),
          sg.Text(key="-TODAY_HIJRI-", font=ARABIC_FONT)],
         [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=GUI_FONT),
@@ -183,7 +185,7 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, list, dic
 
     print("="*50)
 
-    return (initial_layout, UPCOMING_PRAYERS, api_res)
+    return (initial_layout, api_res)
 
 
 # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
@@ -192,15 +194,14 @@ def start_system_tray(win: sg.Window):
     """starts the SystemTray object and instantiates it's menu and tooltip"""
     menu = ['', ['Show Window', 'Hide Window', '---', 'Stop athan',
                  'Settings', 'Exit']]
-    tooltip = 'Next prayer X in Y'
-    tray = SystemTray(menu=menu, tooltip=tooltip,
+    tray = SystemTray(menu=menu, tooltip="Next Prayer",
                       window=win, icon=APP_ICON)
     tray.show_message(
         title="Athany", message="Press 'Minimize' to minimize application to system tray")
     return tray
 
 
-def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, current_month_data) -> bool:
+def display_main_window(main_win_layout, current_month_data) -> bool:
     """Displays the main application window, keeps running until window is closed\n
     Return:
         save_loc_check (bool) - boolean value whether the user wants to save his location data or not after application is closed
@@ -212,54 +213,58 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
     win2_active = False
     athan_play_obj = None
     end_of_month_hijri = None
+    global UPCOMING_PRAYERS
+    global save_loc_check
     while True:
         now = datetime.datetime.now().replace(microsecond=0)
 
-        if now >= upcoming_prayers[0][1]:
+        if now >= UPCOMING_PRAYERS[0][1]:
             application_tray.show_message(
-                title="Athany", message=f"It's time for {upcoming_prayers[0][0]} prayer")
+                title="Athany", message=f"It's time for {UPCOMING_PRAYERS[0][0]} prayer")
 
             # remove current fard from list, update remaining time to be 0 before playing athan sound
-            upcoming_prayers.pop(0)
-            window['-TIME_D-'].update(value='00:00:00')
+            UPCOMING_PRAYERS.pop(0)
 
-            # play athan sound from user athan sound settings
-            athan_play_obj = play_selected_athan()
+            # play athan sound from user athan sound settings (if athan sound not muted)
+            if not sg.user_settings_get_entry('-mute-athan-'):
+                athan_play_obj = play_selected_athan()
 
             # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
-            if len(upcoming_prayers) == 0:
+            if len(UPCOMING_PRAYERS) == 0:
                 new_data = get_main_layout_and_tomorrow_prayers(fetch_calender_data(
                     sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), date=now))
-                upcoming_prayers = new_data[1]
-                current_month_data = new_data[2]
+                current_month_data = new_data[1]
                 del new_data
-                for prayer in upcoming_prayers:
+                for prayer in UPCOMING_PRAYERS:
                     window[f'-{prayer[0].upper()} TIME-'].update(
                         value=prayer[1].strftime("%I:%M %p"))
 
         # get remaining time till next prayer
-        time_d = upcoming_prayers[0][1] - now
+        time_d = UPCOMING_PRAYERS[0][1] - now
 
         # update the main window with the next prayer and remaining time
         window['-NEXT PRAYER-'].update(
-            value=f'{upcoming_prayers[0][0]}', font=GUI_FONT+" bold")
+            value=f'{UPCOMING_PRAYERS[0][0]}', font=GUI_FONT+" bold")
         window['-TIME_D-'].update(value=f'{time_d}')
         # update the current dates
         window['-TODAY-'].update(
             value=now.date().strftime("%a %d %b %y"))
 
-        if now.month == upcoming_prayers[0][1].month:
+        if now.month == UPCOMING_PRAYERS[0][1].month:
             end_of_month_hijri = None
             window['-TODAY_HIJRI-'].update(
                 value=get_hijri_date_from_json(now, api_res=current_month_data))
-        elif end_of_month_hijri:
-            window['-TODAY_HIJRI-'].update(value=end_of_month_hijri)
+
         else:
-            end_of_month_hijri = get_hijri_date_from_json(now, api_res=fetch_calender_data(
-                sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), now))
+
+            if not end_of_month_hijri:
+                end_of_month_hijri = get_hijri_date_from_json(now, api_res=fetch_calender_data(
+                    sg.user_settings_get_entry('-city-'), sg.user_settings_get_entry('-country-'), now))
+
+            window['-TODAY_HIJRI-'].update(value=end_of_month_hijri)
         # update system tray tooltip also
         application_tray.set_tooltip(
-            f"Next prayer: {upcoming_prayers[0][0]} in {time_d}")
+            f"Next prayer: {UPCOMING_PRAYERS[0][0]} in {time_d}")
 
         # main event reading
         event1, values1 = window.read(timeout=100)
@@ -290,20 +295,26 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
             win2_active = True
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
-            settings_layout = [[sg.Text(f"Current Athan: {current_athan}", key="-DISPLAYED_MSG-")],
-                               [sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, readonly=True, default_value=current_athan, font=BUTTON_FONT),
-                               sg.Push(), sg.Button("Set athan", font=BUTTON_FONT)],
-                               [sg.Button(image_data=TOGGLE_ON_B64 if save_loc_check else TOGGLE_OFF_B64,
-                                          key='-TOGGLE-GRAPHIC-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
-                                          border_width=0, metadata=save_loc_check),
-                                sg.Text(
-                                    f"Save location ({sg.user_settings_get_entry('-city-')}, {sg.user_settings_get_entry('-country-')})"),
+            settings_layout = [[sg.Text("Mute athan"),
                                 sg.Push(),
-                                sg.Button("Done", font=BUTTON_FONT)]
-                               ]
+                                sg.Button(image_data=TOGGLE_ON_B64 if sg.user_settings_get_entry('-mute-athan-') else TOGGLE_OFF_B64,
+                                          key='-TOGGLE-MUTE-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                          border_width=0, metadata=sg.user_settings_get_entry('-mute-athan-'))],
+                               [sg.Text(f"Save location ({sg.user_settings_get_entry('-city-')}, {sg.user_settings_get_entry('-country-')})"),
+                                sg.Push(),
+                                sg.Button(image_data=TOGGLE_ON_B64 if save_loc_check else TOGGLE_OFF_B64,
+                                          key='-TOGGLE-GRAPHIC-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                          border_width=0, metadata=save_loc_check)],
+                               [sg.Text(f"Current Athan:", key="-DISPLAYED_MSG-"),
+                                sg.Push(),
+                                sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=BUTTON_FONT)],
+                               [sg.Push(), sg.Button("Done", font=BUTTON_FONT, pad=(5, 15))]]
 
-            settings_window = sg.Window(
-                "Athany settings", settings_layout, icon=APP_ICON, font=GUI_FONT, keep_on_top=True)
+            settings_window = sg.Window("Athany - settings",
+                                        settings_layout,
+                                        icon=APP_ICON,
+                                        font=GUI_FONT,
+                                        keep_on_top=True)
 
         # If 2nd window (settings window) is open, read values from it
         if win2_active:
@@ -312,15 +323,11 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                 win2_active = False
                 save_loc_check = settings_window['-TOGGLE-GRAPHIC-'].metadata
                 settings_window.close()
-            elif event2 == "Set athan" and values2[0] in AVAILABLE_ADHANS:
-                sg.user_settings_set_entry(
-                    '-athan_sound-', value=f"{values2[0].replace(' ', '_')}.wav")
-
-                settings_window['-DISPLAYED_MSG-'].update(
-                    value=f"Current Athan: {values2[0]}")
+            elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in AVAILABLE_ADHANS:
+                sg.user_settings_set_entry('-athan_sound-',
+                                           value=f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav")
 
                 # Debugging
-                print(f"[DEBUG] You chose {values2[0]} athan")
                 print("[DEBUG]", sg.user_settings_get_entry("-athan_sound-"))
                 if athan_play_obj:
                     athan_play_obj.stop()
@@ -330,12 +337,17 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
                 settings_window['-TOGGLE-GRAPHIC-'].metadata = not settings_window['-TOGGLE-GRAPHIC-'].metadata
                 settings_window['-TOGGLE-GRAPHIC-'].update(
                     image_data=TOGGLE_ON_B64 if settings_window['-TOGGLE-GRAPHIC-'].metadata else TOGGLE_OFF_B64)
+            elif event2 == "-TOGGLE-MUTE-":
+                settings_window['-TOGGLE-MUTE-'].metadata = not settings_window['-TOGGLE-MUTE-'].metadata
+                settings_window['-TOGGLE-MUTE-'].update(
+                    image_data=TOGGLE_ON_B64 if settings_window['-TOGGLE-MUTE-'].metadata else TOGGLE_OFF_B64)
+                sg.user_settings_set_entry("-mute-athan-",
+                                           value=settings_window['-TOGGLE-MUTE-'].metadata)
     # close application on exit
     application_tray.close()
     window.close()
-    del window
     del application_tray
-    return save_loc_check
+    del window
 
 # ------------------------------------- Option To Choose Location If Not Saved Before ------------------------------------- #
 
@@ -344,13 +356,15 @@ def display_main_window(main_win_layout, upcoming_prayers, save_loc_check, curre
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-')],
                        [sg.Text("City"), sg.Input(size=(20, 1), key="-CITY-", focus=True),
                        sg.Text("Country"), sg.Input(size=(20, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.Button("Ok", size=(10, 1), font=BUTTON_FONT), sg.Push(), sg.Button("Cancel", font=BUTTON_FONT)]]
+                       [sg.Button("Ok", size=(10, 1), font=BUTTON_FONT), sg.Push(), sg.Button("Cancel", size=(10, 1), font=BUTTON_FONT)]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
     # If there are no saved settings, display the choose location window to set these values
-    choose_location = sg.Window(
-        "Athany", location_win_layout, icon=APP_ICON, font="Segoe\ UI 11")
+    choose_location = sg.Window("Athany - set location",
+                                location_win_layout,
+                                icon=APP_ICON,
+                                font=GUI_FONT)
 
     while True:
         event, values = choose_location.read()
@@ -358,12 +372,16 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
             choose_location.close()
             sys.exit()
         if values['-CITY-'].strip() and values['-COUNTRY-'].strip():  # Run the athan api code
+            city = values['-CITY-'].strip().capitalize()
+            country = values['-COUNTRY-'].strip().capitalize()
 
             choose_location['-LOC TXT-'].update(
                 value='Fetching prayer times....')
             choose_location.refresh()
-            m_data = fetch_calender_data(
-                values['-CITY-'], values['-COUNTRY-'], date=datetime.datetime.now())
+
+            m_data = fetch_calender_data(city,
+                                         country,
+                                         date=datetime.datetime.now())
 
             if m_data is None:  # if invalid city/country dont continue
                 choose_location['-LOC TXT-'].update(
@@ -373,17 +391,16 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                     background_color='dark red')
             elif m_data == "RequestError":
                 choose_location["-LOC TXT-"].update(
-                    value="Please ensure you're connected to the internet and try again")
+                    value="Internet connection required, connect to the internet and try again")
             else:
                 sg.user_settings_set_entry('-city-',
-                                           values['-CITY-'])
+                                           city)
                 sg.user_settings_set_entry('-country-',
-                                           values['-COUNTRY-'])
+                                           country)
 
-                SAVED_LOCATION = values['-SAVE_LOC_CHECK-']
+                save_loc_check = values['-SAVE_LOC_CHECK-']
 
-                start_data = get_main_layout_and_tomorrow_prayers(
-                    m_data)
+                start_data = get_main_layout_and_tomorrow_prayers(m_data)
 
                 # close location choosing window, start main app window
                 break
@@ -391,22 +408,22 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
     choose_location.close()
     del choose_location  # tkinter cleanup
 else:
-    SAVED_LOCATION = True
-    m_data = fetch_calender_data(sg.user_settings_get_entry(
-        '-city-'), sg.user_settings_get_entry('-country-'), date=datetime.datetime.now())
+    save_loc_check = True
+    m_data = fetch_calender_data(sg.user_settings_get_entry('-city-'),
+                                 sg.user_settings_get_entry('-country-'),
+                                 date=datetime.datetime.now())
 
-    start_data = get_main_layout_and_tomorrow_prayers(
-        m_data)
+    start_data = get_main_layout_and_tomorrow_prayers(m_data)
 
 # ------------------------------------- Starts The GUI ------------------------------------- #
 
 try:
-    SAVED_LOCATION = display_main_window(
-        main_win_layout=start_data[0], upcoming_prayers=start_data[1], save_loc_check=SAVED_LOCATION, current_month_data=start_data[2])
+    display_main_window(main_win_layout=start_data[0],
+                        current_month_data=start_data[1])
 except KeyboardInterrupt:
     sys.exit()
 
 # If user doesn't want to save settings, delete saved entries before closing
-if not SAVED_LOCATION and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
+if not save_loc_check and sg.user_settings_get_entry('-city-') and sg.user_settings_get_entry('-country-'):
     sg.user_settings_delete_entry('-city-')
     sg.user_settings_delete_entry('-country-')
