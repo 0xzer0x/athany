@@ -195,8 +195,8 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
 
     # the rest of the main window layout
     initial_layout += [[sg.HorizontalSeparator(color="dark brown")],
-                       [sg.Button("Settings", font=BUTTON_FONT), sg.Button("Stop athan", font=BUTTON_FONT), sg.Push(),
-                       sg.Button("Minimize", font=BUTTON_FONT), sg.Button("Exit", font=BUTTON_FONT)]]
+                       [sg.Button("Settings", key='-SETTINGS-', font=BUTTON_FONT), sg.Button("Stop athan", key='-STOP-ATHAN-', font=BUTTON_FONT), sg.Push(),
+                       sg.Button("Minimize", key='-MINIMIZE-', font=BUTTON_FONT), sg.Button("Exit", key='-EXIT-', font=BUTTON_FONT)]]
 
     print("="*50)
 
@@ -293,10 +293,10 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
             print("[DEBUG] SystemTray event:", event1)
 
         # Event check and preform action
-        if event1 in (sg.WIN_CLOSED, "Exit"):
+        if event1 in (sg.WIN_CLOSED, "-EXIT-"):
             break
 
-        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Minimize", "Hide Window"):
+        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-MINIMIZE-", "Hide Window"):
             window.hide()
             application_tray.show_icon()
             application_tray.show_message(title="Athany minimized to system tray",
@@ -306,12 +306,12 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
             window.un_hide()
             window.bring_to_front()
 
-        elif event1 == "Stop athan" and athan_play_obj:
+        elif event1 == "-STOP-ATHAN-" and athan_play_obj:
             if athan_play_obj.is_playing():
                 athan_play_obj.stop()
 
         # if clicked settings button, open up the settings window and read values from it along with the main window
-        elif event1 == "Settings" and not win2_active:
+        elif event1 == "-SETTINGS-" and not win2_active:
             win2_active = True
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
@@ -328,7 +328,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                                [sg.Text(f"Current Athan:", key="-DISPLAYED_MSG-"),
                                 sg.Push(),
                                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=BUTTON_FONT)],
-                               [sg.Push(), sg.Button("Done", font=BUTTON_FONT, pad=(5, 15))]]
+                               [sg.Push(), sg.Button("Done", key='-DONE-', font=BUTTON_FONT, pad=(5, 15))]]
 
             settings_window = sg.Window("Athany - settings",
                                         settings_layout,
@@ -339,7 +339,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
         # If 2nd window (settings window) is open, read values from it
         if win2_active:
             event2, values2 = settings_window.read(timeout=100)
-            if event2 in (sg.WIN_CLOSED, "Done"):
+            if event2 in (sg.WIN_CLOSED, "-DONE-"):
                 win2_active = False
                 save_loc_check = settings_window['-TOGGLE-GRAPHIC-'].metadata
                 settings_window.close()
@@ -377,11 +377,12 @@ location_api = get_current_location()
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-')],
                        [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
                        sg.Text("Country"), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.Button("Ok", size=(10, 1), font=BUTTON_FONT, bind_return_key=True),
-                       sg.Button("Use current location", font=BUTTON_FONT),
+                       [sg.Button("Ok", key='-OK-', size=(10, 1), font=BUTTON_FONT, bind_return_key=True),
+                       sg.Button("Use current location",
+                                 key='-USE-CURRENT-LOCATION-', font=BUTTON_FONT),
                        sg.Text(f"({location_api[0]}, {location_api[1]})" if location_api != "RequestError" else "(Internet connection required)",
                                key='-AUTO-LOCATION-'),
-                       sg.Push(), sg.Button("Cancel", size=(10, 1), font=BUTTON_FONT)]]
+                       sg.Push(), sg.Button("Cancel", key='-CANCEL-', size=(10, 1), font=BUTTON_FONT)]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
@@ -395,13 +396,13 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
         m_data = False
         event, values = choose_location.read()
 
-        if event == sg.WIN_CLOSED or event == "Cancel":
+        if event in (sg.WIN_CLOSED, "-CANCEL-"):
             choose_location.close()
             sys.exit()
 
         # Run the athan api code
         else:
-            if event == "Ok" and values['-CITY-'].strip() and values['-COUNTRY-'].strip():
+            if event == "-OK-" and values['-CITY-'].strip() and values['-COUNTRY-'].strip():
                 city = values['-CITY-'].strip().capitalize()
                 country = values['-COUNTRY-'].strip().capitalize()
 
@@ -422,7 +423,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                         background_color='dark red')
                     continue
 
-            elif event == "Use current location":
+            elif event == "-USE-CURRENT-LOCATION-":
                 location_api = get_current_location(
                 ) if location_api == "RequestError" else location_api
 
