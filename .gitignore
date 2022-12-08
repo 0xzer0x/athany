@@ -1,4 +1,6 @@
 Data/*
 !Data/*.dat
+**.py
+!athany.py
 *.zip
 .gitignore

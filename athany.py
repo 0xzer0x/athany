@@ -45,7 +45,7 @@ AVAILABLE_ADHANS = ['Default',
 
 
 GUI_FONT = "Segoe\ UI 11"
-BUTTON_FONT = "Helvetica 10"
+BUTTON_FONT = "Segoe\ UI 10"
 ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
 
 
@@ -69,6 +69,21 @@ def play_selected_athan() -> simpleaudio.PlayObject:
     wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
     play_obj = wave_obj.play()
     return play_obj
+
+
+def get_current_location() -> tuple[str, str] | str:
+    """ function that gets the current city and country of the user IP\n
+    Return:
+        (city, country) - tuple containing 2 strings of the city & country fetched
+    """
+    try:
+        IP_city = requests.get("https://ipinfo.io/city", timeout=100).text
+        IP_country = requests.get(
+            "https://ipinfo.io/country", timeout=100).text
+        print("[DEBUG]", IP_city.strip(), IP_country.strip())
+        return (IP_city.strip(), IP_country.strip())
+    except:
+        return "RequestError"
 
 
 def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
@@ -207,7 +222,9 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
         save_loc_check (bool) - boolean value whether the user wants to save his location data or not after application is closed
     """
     window = sg.Window("Athany: a python athan app",
-                       main_win_layout, finalize=True, icon=APP_ICON) if main_win_layout else sys.exit()
+                       main_win_layout,
+                       icon=APP_ICON,
+                       finalize=True)
 
     application_tray = start_system_tray(win=window)
     win2_active = False
@@ -352,11 +369,16 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
 # ------------------------------------- Option To Choose Location If Not Saved Before ------------------------------------- #
 
 
+location_api = get_current_location()
 # define the layout for the 'choose location' window
 location_win_layout = [[sg.Text("Enter your location", size=(50, 1), key='-LOC TXT-')],
-                       [sg.Text("City"), sg.Input(size=(20, 1), key="-CITY-", focus=True),
-                       sg.Text("Country"), sg.Input(size=(20, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
-                       [sg.Button("Ok", size=(10, 1), font=BUTTON_FONT), sg.Push(), sg.Button("Cancel", size=(10, 1), font=BUTTON_FONT)]]
+                       [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
+                       sg.Text("Country"), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key='-SAVE_LOC_CHECK-')],
+                       [sg.Button("Ok", size=(10, 1), font=BUTTON_FONT, bind_return_key=True),
+                       sg.Button("Use current location", font=BUTTON_FONT),
+                       sg.Text(f"({location_api[0]}, {location_api[1]})" if location_api != "RequestError" else "(Internet connection required)",
+                               key='-AUTO-LOCATION-'),
+                       sg.Push(), sg.Button("Cancel", size=(10, 1), font=BUTTON_FONT)]]
 
 
 if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('-country-') is None:
@@ -367,31 +389,61 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                                 font=GUI_FONT)
 
     while True:
+        m_data = False
         event, values = choose_location.read()
+
         if event == sg.WIN_CLOSED or event == "Cancel":
             choose_location.close()
             sys.exit()
-        if values['-CITY-'].strip() and values['-COUNTRY-'].strip():  # Run the athan api code
-            city = values['-CITY-'].strip().capitalize()
-            country = values['-COUNTRY-'].strip().capitalize()
 
-            choose_location['-LOC TXT-'].update(
-                value='Fetching prayer times....')
-            choose_location.refresh()
+        # Run the athan api code
+        else:
+            if event == "Ok" and values['-CITY-'].strip() and values['-COUNTRY-'].strip():
+                city = values['-CITY-'].strip().capitalize()
+                country = values['-COUNTRY-'].strip().capitalize()
 
-            m_data = fetch_calender_data(city,
-                                         country,
-                                         date=datetime.datetime.now())
-
-            if m_data is None:  # if invalid city/country dont continue
                 choose_location['-LOC TXT-'].update(
-                    value='Invalid city or country, enter a valid location')
-                choose_location['-CITY-'].update(background_color='dark red')
-                choose_location['-COUNTRY-'].update(
-                    background_color='dark red')
+                    value=f'Fetching prayer times for {city},{country}....')
+                choose_location.refresh()
+
+                m_data = fetch_calender_data(city,
+                                             country,
+                                             date=datetime.datetime.now())
+
+                if m_data is None:  # if invalid city/country dont continue
+                    choose_location['-LOC TXT-'].update(
+                        value='Invalid city or country, enter a valid location')
+                    choose_location['-CITY-'].update(
+                        background_color='dark red')
+                    choose_location['-COUNTRY-'].update(
+                        background_color='dark red')
+                    continue
+
+            elif event == "Use current location":
+                location_api = get_current_location(
+                ) if location_api == "RequestError" else location_api
+
+                if location_api == "RequestError":
+                    choose_location["-AUTO-LOCATION-"].update(
+                        value="(Internet connection required)")
+                    continue
+
+                city = location_api[0]
+                country = location_api[1]
+
+                choose_location['-LOC TXT-'].update(
+                    value=f'Fetching prayer times for {city},{country}...')
+                choose_location.refresh()
+
+                m_data = fetch_calender_data(city,
+                                             country,
+                                             date=datetime.datetime.now())
+
+            if not m_data:
+                continue
             elif m_data == "RequestError":
                 choose_location["-LOC TXT-"].update(
-                    value="Internet connection required, connect to the internet and try again")
+                    value="Internet connection required")
             else:
                 sg.user_settings_set_entry('-city-',
                                            city)
