@@ -6,7 +6,7 @@
 
 <br>
  
-#### Athany is a lightweight python program for windows and linux that fetches the times for the five mandatory muslim prayers, tells you the time remaining until the next prayer, and plays the athan sound when the prayer time comes.
+#### [Athany](https://github.com/0xzer0x/athany-app/releases/latest) is a lightweight python program for windows and linux that fetches the times for the five mandatory muslim prayers, tells you the time remaining until the next prayer, and plays the athan sound when the prayer time comes.
  
 <br>
  
@@ -30,7 +30,7 @@
   - `python-bidi`
   - `arabic-reshaper`
 
-## Installation
+## Installation (for development)
 
 1. Install tkinter (`python-tk` on debian-based, `tk` on arch-based) using your package manager if you're on Linux, you may need to install extra dependencies like alsa sound libraries and `libappindicator3-1`.
 
