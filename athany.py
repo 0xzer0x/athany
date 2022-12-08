@@ -212,7 +212,7 @@ def start_system_tray(win: sg.Window):
     tray = SystemTray(menu=menu, tooltip="Next Prayer",
                       window=win, icon=APP_ICON)
     tray.show_message(
-        title="Athany", message="Press 'Minimize' to minimize application to system tray")
+        title="Athany", message="Press 'Minimize' or close to minimize application to system tray")
     return tray
 
 
@@ -224,6 +224,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
     window = sg.Window("Athany: a python athan app",
                        main_win_layout,
                        icon=APP_ICON,
+                       enable_close_attempted_event=True,
                        finalize=True)
 
     application_tray = start_system_tray(win=window)
@@ -298,6 +299,8 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
         if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Minimize", "Hide Window"):
             window.hide()
             application_tray.show_icon()
+            application_tray.show_message(title="Athany minimized to system tray",
+                                          message="To completely close the app, press the 'Exit' button")
 
         elif event1 in ('Show Window', sg.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
             window.un_hide()
