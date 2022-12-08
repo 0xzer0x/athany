@@ -185,7 +185,8 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
             sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=GUI_FONT)]
     ]
     for prayer, time in current_times.items():  # append upcoming prayers to list
-        if prayer in FUROOD_NAMES:  # setting the main window layout with the inital prayer times
+        # setting the main window layout with the inital prayer times
+        if prayer in FUROOD_NAMES or prayer == "Sunrise":
             initial_layout.append([sg.Text(f"{prayer}:", font=GUI_FONT), sg.Push(),
                                    sg.Text(f"{time.strftime('%I:%M %p')}", font=GUI_FONT, key=f"-{prayer.upper()} TIME-")])
 
@@ -237,15 +238,16 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
         now = datetime.datetime.now().replace(microsecond=0)
 
         if now >= UPCOMING_PRAYERS[0][1]:
-            application_tray.show_message(
-                title="Athany", message=f"It's time for {UPCOMING_PRAYERS[0][0]} prayer")
-
             # remove current fard from list, update remaining time to be 0 before playing athan sound
-            UPCOMING_PRAYERS.pop(0)
+            fard = UPCOMING_PRAYERS.pop(0)
+
+            if fard[0] != "Sunrise":
+                application_tray.show_message(
+                    title="Athany", message=f"It's time for {fard[0]} prayer")
 
             # play athan sound from user athan sound settings (if athan sound not muted)
-            if not sg.user_settings_get_entry('-mute-athan-'):
-                athan_play_obj = play_selected_athan()
+                if not sg.user_settings_get_entry('-mute-athan-'):
+                    athan_play_obj = play_selected_athan()
 
             # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
             if len(UPCOMING_PRAYERS) == 0:
