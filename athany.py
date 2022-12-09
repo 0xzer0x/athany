@@ -59,6 +59,16 @@ with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
 # ------------------------------------- Main Application logic ------------------------------------- #
 
 
+def GraphicButton(text, key, image_b64):
+    '''
+    :param text: (str) Text you want to display on the button
+    :param key:  (Any) The key for the button
+    :param image_data: (str) The Base64 image to use on the button
+    :return: (PySimpleGUI.Button) A button with a Base64 image instead of normal tk buttons
+    '''
+    return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=(0, 0), key=key, border_width=0)
+
+
 def play_selected_athan() -> simpleaudio.PlayObject:
     """ fetches current settings for athan and plays the corresponding athan
     :return: (simpleaudio.PlayObject) play object to control playback of athan
@@ -68,16 +78,6 @@ def play_selected_athan() -> simpleaudio.PlayObject:
     wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
     play_obj = wave_obj.play()
     return play_obj
-
-
-def GraphicButton(text, key, image_b64):
-    '''
-    :param text: (str) Text you want to display on the button
-    :param key:  (Any) The key for the button
-    :param image_data: (str) The Base64 image to use on the button
-    :return: (PySimpleGUI.Button) A button with a Base64 image instead of normal tk buttons
-    '''
-    return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=(0, 0), key=key, border_width=0)
 
 
 def get_current_location() -> tuple[str, str] | str:
@@ -96,6 +96,9 @@ def get_current_location() -> tuple[str, str] | str:
 
 def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
     """ check if calender data for the city+country+month+year exists and fetch it if not
+    :param cit: (str) city to get data for
+    :param count: (str) country to get data for
+    :param date: (datetime.datetime) date to get data for (uses month and year)
     :return: (dict) api response json data dictionary
     """
     json_month_file = os.path.join(
@@ -121,7 +124,9 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
 
 def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
     """ function to return arabic hijri date string to display in main window
-    :return: (str) Arabic string of current Hijri date 
+    :param date: (datetime.datetime) date to get hijri date for
+    :param api_res: (dict) api response to extract hijri date from
+    :return: (str) Arabic string of current Hijri date
     """
     hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
     text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
@@ -150,7 +155,7 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
     # if NOW is after current Isha time
     if datetime.datetime.now() > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {now.day} {now.month} {now.year}", "%H:%M %d %m %Y"):
         # replace all prayer times with the next day prayers
-        if tomorrow.day < now.day:  # SPECIAL CASE: if today is the last day in the month, fetch new month calender and adjust the timings
+        if tomorrow.day < now.day:  # SPECIAL CASE: if today is the last day in the month, fetch new month calender
             api_res = fetch_calender_data(sg.user_settings_get_entry(
                 '-city-'), sg.user_settings_get_entry('-country-'), date=tomorrow)
             if api_res == "RequestError":
@@ -336,7 +341,11 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                                [sg.Text(f"Current Athan:", key="-DISPLAYED_MSG-"),
                                 sg.Push(),
                                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=BUTTON_FONT)],
-                               [sg.Push(), sg.Button("Done", key='-DONE-', font=BUTTON_FONT, pad=(5, 15))]]
+                               [sg.Button('Download rest of year calender', key='-GET-REST-OF-YEAR-', font=BUTTON_FONT),
+                               sg.Text(key='-REST-OF-YEAR-PROG-',
+                                       font="Segoe\ UI 8 bold"),
+                               sg.Push(),
+                               sg.Button("Done", key='-DONE-', font=BUTTON_FONT, pad=(5, 15))]]
 
             settings_window = sg.Window("Athany - settings",
                                         settings_layout,
@@ -351,6 +360,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                 win2_active = False
                 save_loc_check = settings_window['-TOGGLE-GRAPHIC-'].metadata
                 settings_window.close()
+
             elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in AVAILABLE_ADHANS:
                 sg.user_settings_set_entry('-athan_sound-',
                                            value=f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav")
@@ -361,10 +371,24 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                     athan_play_obj.stop()
                 athan_play_obj = play_selected_athan()
 
+            elif event2 == '-GET-REST-OF-YEAR-':
+                mon_d = 1
+                while mon_d + now.month <= 12:
+                    settings_window['-REST-OF-YEAR-PROG-'].update(
+                        value=f'Downloading month {mon_d + now.month} data...')
+                    settings_window.refresh()
+                    fetch_calender_data(sg.user_settings_get_entry('-city-'),
+                                        sg.user_settings_get_entry(
+                                            '-country-'),
+                                        now.replace(month=mon_d + now.month))
+                    mon_d += 1
+                settings_window['-REST-OF-YEAR-PROG-'].update(value='All set!')
+
             elif event2 == "-TOGGLE-GRAPHIC-":
                 settings_window['-TOGGLE-GRAPHIC-'].metadata = not settings_window['-TOGGLE-GRAPHIC-'].metadata
                 settings_window['-TOGGLE-GRAPHIC-'].update(
                     image_data=TOGGLE_ON_B64 if settings_window['-TOGGLE-GRAPHIC-'].metadata else TOGGLE_OFF_B64)
+
             elif event2 == "-TOGGLE-MUTE-":
                 settings_window['-TOGGLE-MUTE-'].metadata = not settings_window['-TOGGLE-MUTE-'].metadata
                 settings_window['-TOGGLE-MUTE-'].update(
