@@ -1,6 +1,7 @@
-Data/*
 !Data/*.dat
+Data/*.json
+Data/Athans/**
+!Data/Athans/Default.wav
 **.py
 !athany.py
 *.zip
-.gitignore
