@@ -61,8 +61,7 @@ with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
 
 def play_selected_athan() -> simpleaudio.PlayObject:
     """ fetches current settings for athan and plays the corresponding athan
-        Return:
-            play_obj (simpleaudio.PlayObject) - play object to control playback of athan
+    :return: (simpleaudio.PlayObject) play object to control playback of athan
     """
     current_athan_path = os.path.join(
         DATA_DIR, sg.user_settings_get_entry('-athan_sound-'))
@@ -71,10 +70,19 @@ def play_selected_athan() -> simpleaudio.PlayObject:
     return play_obj
 
 
+def GraphicButton(text, key, image_b64):
+    '''
+    :param text: (str) Text you want to display on the button
+    :param key:  (Any) The key for the button
+    :param image_data: (str) The Base64 image to use on the button
+    :return: (PySimpleGUI.Button) A button with a Base64 image instead of normal tk buttons
+    '''
+    return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=(0, 0), key=key, border_width=0)
+
+
 def get_current_location() -> tuple[str, str] | str:
     """ function that gets the current city and country of the user IP\n
-    Return:
-        (city, country) - tuple containing 2 strings of the city & country fetched
+    :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
     """
     try:
         IP_city = requests.get("https://ipinfo.io/city", timeout=100).text
@@ -88,8 +96,7 @@ def get_current_location() -> tuple[str, str] | str:
 
 def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
     """ check if calender data for the city+country+month+year exists and fetch it if not
-     Return:
-        month_data (dict) - api response json data dictionary
+    :return: (dict) api response json data dictionary
     """
     json_month_file = os.path.join(
         DATA_DIR, f"{date.year}-{date.month}-{cit}-{count}.json")
@@ -113,7 +120,9 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
 
 
 def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
-    """ function to return arabic hijri date string to display in main window """
+    """ function to return arabic hijri date string to display in main window
+    :return: (str) Arabic string of current Hijri date 
+    """
     hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
     text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
     if sys.platform != "win32" and not MISSING_ARABIC_MODULES:
@@ -125,11 +134,9 @@ def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
 
 def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
     """ sets the prayer times window layout and sets the inital upcoming prayers on application startup\n
-        Arguments:
-            api_res (dict) - adhan api month json response as a dictionary
-        Return:
-            initial_layout (list) - main window layout based on the timings fetched from api_res\n
-            api_res (dict) - the month api data or the new month api data\n
+
+    :param api_res: (dict) - adhan api month json response as a dictionary
+    :return: (Tuple[list, dict]) main window layout based on the timings fetched from api_res, the month api data or the new month api data
     """
     now = datetime.datetime.now()
     tomorrow = now+datetime.timedelta(days=1)
@@ -207,7 +214,9 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
 # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
 
 def start_system_tray(win: sg.Window):
-    """starts the SystemTray object and instantiates it's menu and tooltip"""
+    """starts the SystemTray object and instantiates it's menu and tooltip
+    :return: (psgtray.SystemTray) systemtray object for application
+    """
     menu = ['', ['Show Window', 'Hide Window', '---', 'Stop athan',
                  'Settings', 'Exit']]
     tray = SystemTray(menu=menu, tooltip="Next Prayer",
@@ -218,10 +227,7 @@ def start_system_tray(win: sg.Window):
 
 
 def display_main_window(main_win_layout, current_month_data) -> bool:
-    """Displays the main application window, keeps running until window is closed\n
-    Return:
-        save_loc_check (bool) - boolean value whether the user wants to save his location data or not after application is closed
-    """
+    """Displays the main application window, keeps running until window is closed"""
     window = sg.Window("Athany: a python athan app",
                        main_win_layout,
                        icon=APP_ICON,
