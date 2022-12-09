@@ -39,12 +39,12 @@ save_loc_check = False
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 AVAILABLE_ADHANS = ['Default',
-                    'Alaqsa', 'Alaqsa (short)',
-                    'Egypt', 'Egypt (short)',
-                    'Makkah', 'Makkah (short)',
-                    'Abdul-basit Abdul-samad', 'Abdul-basit Abdul-samad (short)',
-                    'Mishari Alafasy', 'Mishari Alafasy (short)',
-                    'Islam Sobhy', 'Islam Sobhy (short)']
+                    'Alaqsa', 'Alaqsa (Takbeer only)',
+                    'Egypt', 'Egypt (Takbeer only)',
+                    'Makkah', 'Makkah (Takbeer only)',
+                    'Abdul-basit Abdul-samad', 'Abdul-basit Abdul-samad (Takbeer only)',
+                    'Mishari Alafasy', 'Mishari Alafasy (Takbeer only)',
+                    'Islam Sobhy', 'Islam Sobhy (Takbeer only)']
 
 GUI_FONT = "Segoe\ UI 11"
 BUTTON_FONT = "Segoe\ UI 10"
@@ -57,6 +57,8 @@ with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode='rb') as toff:
     TOGGLE_OFF_B64 = toff.read()
 with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
     TOGGLE_ON_B64 = ton.read()
+with open(os.path.join(DATA_DIR, 'download.dat'), mode="rb") as down:
+    DOWNLOAD_ICON_B64 = down.read()
 
 # ------------------------------------- Main Application logic ------------------------------------- #
 
@@ -82,6 +84,42 @@ def GraphicButton(text, key, image_b64):
     :return: (PySimpleGUI.Button) A button with a Base64 image instead of normal tk buttons
     '''
     return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=(0, 0), key=key, border_width=0)
+
+
+def download_athan(athan_filename: str) -> bool:
+    """Function to download athans from app directory on archive.org
+    :param athan_filename: (str) name of .wav file to download from archive.org
+    :return: (bool) True if the download completed successfully without errors, False otherwise
+    """
+    try:
+        saved_file = os.path.join(ATHANS_DIR, athan_filename)
+        file_data = requests.get("https://archive.org/download/athany-data/"+athan_filename,
+                                 stream=True)
+        file_size = int(file_data.headers.get('content-length'))
+
+        progress_layout = [[sg.Text(f"Downloading {athan_filename} ({file_size//1024} KB) from archive...")],
+                           [sg.ProgressBar(max_value=file_size, size=(20, 10), orientation='h', key='-PROGRESS-METER-', expand_x=True)]]
+
+        dl = 0
+        with open(saved_file, "wb") as athan_file:
+            prog_win = sg.Window("Download",
+                                 progress_layout, keep_on_top=True, icon=DOWNLOAD_ICON_B64)
+
+            for chunk in file_data.iter_content(chunk_size=4096):
+                dl += len(chunk)
+                athan_file.write(chunk)
+
+                prog_win.read(timeout=10)
+                prog_win['-PROGRESS-METER-'].update(current_count=dl)
+
+            prog_win.close()
+            del prog_win
+
+        return True
+    except:
+
+        os.remove(saved_file)
+        return False
 
 
 def play_selected_athan() -> simpleaudio.PlayObject:
@@ -373,14 +411,44 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                 settings_window.close()
 
             elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in AVAILABLE_ADHANS:
+                # get a list of all athans currently in folder as user might have downloaded before
+                DOWNLOADED_ATHANS = os.listdir(ATHANS_DIR)
+                # convert option into filename
                 choosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
-                sg.user_settings_set_entry('-athan_sound-',
-                                           value=choosen_athan)
+
+                if choosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
+                    sg.user_settings_set_entry('-athan_sound-',
+                                               value=choosen_athan)
+                    if athan_play_obj:
+                        athan_play_obj.stop()
+                    athan_play_obj = play_selected_athan()
+
+                else:  # athan is not on pc, will be downloaded from the internet
+                    settings_window['-DISPLAYED_MSG-'].update(
+                        value='Athan downloading...')
+                    settings_window.refresh()
+
+                    if athan_play_obj:
+                        athan_play_obj.stop()
+
+                    # run the download function to get athan from archive
+                    downloaded = download_athan(choosen_athan)
+                    if downloaded:  # if all went well, set as new athan and play audio
+                        sg.user_settings_set_entry('-athan_sound-',
+                                                   value=choosen_athan)
+                        settings_window['-DISPLAYED_MSG-'].update(
+                            value='Current Athan:')
+                        settings_window.refresh()
+
+                        athan_play_obj = play_selected_athan()
+
+                    else:  # something messed up during download or no internet
+                        application_tray.show_message(
+                            title="Download Failed", message="Couldn't download athan file, check your internet connection and try again")
+
                 # Debugging
-                print("[DEBUG]", sg.user_settings_get_entry("-athan_sound-"))
-                if athan_play_obj:
-                    athan_play_obj.stop()
-                athan_play_obj = play_selected_athan()
+                print("[DEBUG] Current athan:",
+                      sg.user_settings_get_entry("-athan_sound-"))
 
             elif event2 == '-GET-REST-OF-YEAR-':
                 mon_d = 1
