@@ -317,7 +317,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
             print("[DEBUG] SystemTray event:", event1)
 
         # Event check and preform action
-        if event1 in (sg.WIN_CLOSED, "-EXIT-"):
+        if event1 in (sg.WIN_CLOSED, "-EXIT-", "Exit"):
             break
 
         if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-MINIMIZE-", "Hide Window"):
