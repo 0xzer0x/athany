@@ -19,9 +19,12 @@ if sys.platform != "win32":
 # ------------------------------------- Application Settings ------------------------------------- #
 DATA_DIR = os.path.join(os.path.abspath(__file__).split("athany.py")[0],
                         'Data')
+ATHANS_DIR = os.path.join(DATA_DIR, 'Athans')
 
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
+if not os.path.exists(ATHANS_DIR):
+    os.mkdir(ATHANS_DIR)
 
 sg.theme("DarkAmber")
 sg.user_settings_filename(filename='athany-config.json')
@@ -43,7 +46,6 @@ AVAILABLE_ADHANS = ['Default',
                     'Mishari Alafasy', 'Mishari Alafasy (short)',
                     'Islam Sobhy', 'Islam Sobhy (short)']
 
-
 GUI_FONT = "Segoe\ UI 11"
 BUTTON_FONT = "Segoe\ UI 10"
 ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
@@ -57,6 +59,19 @@ with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
     TOGGLE_ON_B64 = ton.read()
 
 # ------------------------------------- Main Application logic ------------------------------------- #
+
+
+def display_ar_text(text: str) -> str:
+    """
+    :param text: (str) arabic text to display correctly
+    :return: (str) correctly formatted arabic string
+    """
+    if sys.platform != 'win32' and not MISSING_ARABIC_MODULES:
+        ar_txt = arabic_reshaper.reshape(text)
+        bidi_txt = get_display(ar_txt)
+        return bidi_txt
+    else:
+        return text
 
 
 def GraphicButton(text, key, image_b64):
@@ -74,7 +89,7 @@ def play_selected_athan() -> simpleaudio.PlayObject:
     :return: (simpleaudio.PlayObject) play object to control playback of athan
     """
     current_athan_path = os.path.join(
-        DATA_DIR, sg.user_settings_get_entry('-athan_sound-'))
+        ATHANS_DIR, sg.user_settings_get_entry('-athan_sound-'))
     wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
     play_obj = wave_obj.play()
     return play_obj
@@ -85,17 +100,18 @@ def get_current_location() -> tuple[str, str] | str:
     :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
     """
     try:
-        IP_city = requests.get("https://ipinfo.io/city", timeout=100).text
-        IP_country = requests.get(
-            "https://ipinfo.io/country", timeout=100).text
-        print("[DEBUG]", IP_city.strip(), IP_country.strip())
-        return (IP_city.strip(), IP_country.strip())
+        IP_city = requests.get("https://ipinfo.io/city",
+                               timeout=100).text.strip()
+        IP_country = requests.get("https://ipinfo.io/country",
+                                  timeout=100).text.strip()
+        print("[DEBUG]", IP_city, IP_country)
+        return (IP_city, IP_country)
     except:
         return "RequestError"
 
 
 def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
-    """ check if calender data for the city+country+month+year exists and fetch it if not
+    """check if calender data for the city+country+month+year exists and fetch it if not
     :param cit: (str) city to get data for
     :param count: (str) country to get data for
     :param date: (datetime.datetime) date to get data for (uses month and year)
@@ -123,23 +139,18 @@ def fetch_calender_data(cit: str, count: str, date: datetime.datetime) -> dict:
 
 
 def get_hijri_date_from_json(date: datetime.datetime, api_res) -> str:
-    """ function to return arabic hijri date string to display in main window
+    """function to return arabic hijri date string to display in main window
     :param date: (datetime.datetime) date to get hijri date for
     :param api_res: (dict) api response to extract hijri date from
     :return: (str) Arabic string of current Hijri date
     """
     hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
     text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
-    if sys.platform != "win32" and not MISSING_ARABIC_MODULES:
-        arabic_text = get_display(arabic_reshaper.reshape(text))
-        return arabic_text
-    else:
-        return text
+    return display_ar_text(text=text)
 
 
 def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
-    """ sets the prayer times window layout and sets the inital upcoming prayers on application startup\n
-
+    """sets the prayer times window layout and sets the inital upcoming prayers on application startup
     :param api_res: (dict) - adhan api month json response as a dictionary
     :return: (Tuple[list, dict]) main window layout based on the timings fetched from api_res, the month api data or the new month api data
     """
@@ -254,7 +265,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
 
             if fard[0] != "Sunrise":
                 application_tray.show_message(
-                    title="Athany", message=f"It's time for {fard[0]} prayer")
+                    title="Athany", message=f"It's time for {fard[0]} prayer 🕌")
 
             # play athan sound from user athan sound settings (if athan sound not muted)
                 if not sg.user_settings_get_entry('-mute-athan-'):
@@ -338,7 +349,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                                 sg.Button(image_data=TOGGLE_ON_B64 if save_loc_check else TOGGLE_OFF_B64,
                                           key='-TOGGLE-GRAPHIC-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
                                           border_width=0, metadata=save_loc_check)],
-                               [sg.Text(f"Current Athan:", key="-DISPLAYED_MSG-"),
+                               [sg.Text("Current Athan:", key="-DISPLAYED_MSG-"),
                                 sg.Push(),
                                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=BUTTON_FONT)],
                                [sg.Button('Download rest of year calender', key='-GET-REST-OF-YEAR-', font=BUTTON_FONT),
@@ -362,9 +373,9 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                 settings_window.close()
 
             elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in AVAILABLE_ADHANS:
+                choosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
                 sg.user_settings_set_entry('-athan_sound-',
-                                           value=f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav")
-
+                                           value=choosen_athan)
                 # Debugging
                 print("[DEBUG]", sg.user_settings_get_entry("-athan_sound-"))
                 if athan_play_obj:
