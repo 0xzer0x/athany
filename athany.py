@@ -27,9 +27,8 @@ if not os.path.exists(ATHANS_DIR):
     os.mkdir(ATHANS_DIR)
 
 sg.theme("DarkAmber")
-print(sg.theme_button_color_background())
 sg.user_settings_filename(filename='athany-config.json')
-if not sg.user_settings_get_entry('-athan_sound-'):
+if not sg.user_settings_get_entry('-athan_sound-') or sg.user_settings_get_entry('-athan_sound-') not in os.listdir(ATHANS_DIR):
     sg.user_settings_set_entry('-athan_sound-', value='Default.wav')
 if not sg.user_settings_get_entry('-mute-athan-'):
     sg.user_settings_set_entry('-mute-athan-', value=False)
@@ -313,9 +312,12 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                     title="Athany", message=f"It's time for {fard[0]} prayer 🕌")
 
             # play athan sound from user athan sound settings (if athan sound not muted)
-                if not sg.user_settings_get_entry('-mute-athan-'):
-                    athan_play_obj = play_selected_athan()
-
+                try:
+                    if not sg.user_settings_get_entry('-mute-athan-'):
+                        athan_play_obj = play_selected_athan()
+                except:
+                    print(
+                        "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
             # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
             if len(UPCOMING_PRAYERS) == 0:
                 new_data = get_main_layout_and_tomorrow_prayers(fetch_calender_data(
