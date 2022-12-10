@@ -377,7 +377,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
             window.un_hide()
             window.bring_to_front()
 
-        elif event1 == "-STOP-ATHAN-" and athan_play_obj:
+        elif event1 in ("-STOP-ATHAN-", 'Stop athan') and athan_play_obj:
             if athan_play_obj.is_playing():
                 athan_play_obj.stop()
 
