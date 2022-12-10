@@ -27,6 +27,7 @@ if not os.path.exists(ATHANS_DIR):
     os.mkdir(ATHANS_DIR)
 
 sg.theme("DarkAmber")
+print(sg.theme_button_color_background())
 sg.user_settings_filename(filename='athany-config.json')
 if not sg.user_settings_get_entry('-athan_sound-'):
     sg.user_settings_set_entry('-athan_sound-', value='Default.wav')
@@ -51,14 +52,15 @@ BUTTON_FONT = "Segoe\ UI 10"
 ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
 
 
-with open(os.path.join(DATA_DIR, "icon.dat"), mode='rb') as icon:
+with open(os.path.join(DATA_DIR, "app_icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
+with open(os.path.join(DATA_DIR, 'download.dat'), mode="rb") as down:
+    DOWNLOAD_ICON_B64 = down.read()
 with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode='rb') as toff:
     TOGGLE_OFF_B64 = toff.read()
 with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode='rb') as ton:
     TOGGLE_ON_B64 = ton.read()
-with open(os.path.join(DATA_DIR, 'download.dat'), mode="rb") as down:
-    DOWNLOAD_ICON_B64 = down.read()
+
 
 # ------------------------------------- Main Application logic ------------------------------------- #
 
@@ -76,14 +78,14 @@ def display_ar_text(text: str) -> str:
         return text
 
 
-def GraphicButton(text, key, image_b64):
+def GraphicButton(text, key, image_b64, pad=(0, 0)):
     '''
     :param text: (str) Text you want to display on the button
     :param key:  (Any) The key for the button
     :param image_data: (str) The Base64 image to use on the button
     :return: (PySimpleGUI.Button) A button with a Base64 image instead of normal tk buttons
     '''
-    return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=(0, 0), key=key, border_width=0)
+    return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=pad, key=key, border_width=0)
 
 
 def download_athan(athan_filename: str) -> bool:
@@ -98,18 +100,24 @@ def download_athan(athan_filename: str) -> bool:
         file_size = int(file_data.headers.get('content-length'))
 
         progress_layout = [[sg.Text(f"Downloading {athan_filename} ({file_size//1024} KB) from archive...")],
-                           [sg.ProgressBar(max_value=file_size, size=(20, 10), orientation='h', key='-PROGRESS-METER-', expand_x=True)]]
+                           [sg.ProgressBar(max_value=file_size,
+                                           size=(20, 10), expand_x=True, orientation='h', key='-PROGRESS-METER-')],
+                           [sg.Push(), sg.Button("Cancel")]]
 
+        prog_win = sg.Window("Download athan",
+                             progress_layout, keep_on_top=True, icon=DOWNLOAD_ICON_B64, enable_close_attempted_event=True)
         dl = 0
         with open(saved_file, "wb") as athan_file:
-            prog_win = sg.Window("Download",
-                                 progress_layout, keep_on_top=True, icon=DOWNLOAD_ICON_B64)
 
             for chunk in file_data.iter_content(chunk_size=4096):
                 dl += len(chunk)
                 athan_file.write(chunk)
 
-                prog_win.read(timeout=10)
+                prog_e, prog_v = prog_win.read(timeout=10)
+                if prog_e in (sg.WIN_CLOSE_ATTEMPTED_EVENT, 'Cancel'):
+                    prog_win.close()
+                    del prog_win
+                    raise Exception
                 prog_win['-PROGRESS-METER-'].update(current_count=dl)
 
             prog_win.close()
@@ -117,7 +125,6 @@ def download_athan(athan_filename: str) -> bool:
 
         return True
     except:
-
         os.remove(saved_file)
         return False
 
@@ -443,6 +450,11 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                         athan_play_obj = play_selected_athan()
 
                     else:  # something messed up during download or no internet
+                        settings_window['-DISPLAYED_MSG-'].update(
+                            value='Current Athan:')
+                        settings_window['-DROPDOWN-ATHANS-'].update(
+                            value=current_athan)
+                        settings_window.refresh()
                         application_tray.show_message(
                             title="Download Failed", message="Couldn't download athan file, check your internet connection and try again")
 
