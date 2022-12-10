@@ -382,7 +382,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                 athan_play_obj.stop()
 
         # if clicked settings button, open up the settings window and read values from it along with the main window
-        elif event1 == "-SETTINGS-" and not win2_active:
+        elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
             win2_active = True
             current_athan = sg.user_settings_get_entry(
                 '-athan_sound-').split('.')[0].replace("_", " ")
