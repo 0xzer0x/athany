@@ -33,7 +33,6 @@ if not sg.user_settings_get_entry('-athan_sound-') or sg.user_settings_get_entry
 if not sg.user_settings_get_entry('-mute-athan-'):
     sg.user_settings_set_entry('-mute-athan-', value=False)
 
-
 UPCOMING_PRAYERS = []
 save_loc_check = False
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
@@ -258,8 +257,11 @@ def get_main_layout_and_tomorrow_prayers(api_res: dict) -> tuple[list, dict]:
 
     # the rest of the main window layout
     initial_layout += [[sg.HorizontalSeparator(color="dark brown")],
-                       [sg.Button("Settings", key='-SETTINGS-', font=BUTTON_FONT), sg.Button("Stop athan", key='-STOP-ATHAN-', font=BUTTON_FONT), sg.Push(),
-                       sg.Button("Minimize", key='-MINIMIZE-', font=BUTTON_FONT), sg.Button("Exit", key='-EXIT-', font=BUTTON_FONT)]]
+                       [sg.Button("Settings", key='-SETTINGS-', font=BUTTON_FONT),
+                        sg.Button("Stop athan", key='-STOP-ATHAN-',
+                                  font=BUTTON_FONT),
+                        sg.Push(),
+                        sg.Text("Current time", font="consolas 10"), sg.Text("~", font="consolas 10"), sg.Text(key='-CURRENT-TIME-', font="consolas 10")]]
 
     print("="*50)
 
@@ -277,7 +279,7 @@ def start_system_tray(win: sg.Window):
     tray = SystemTray(menu=menu, tooltip="Next Prayer",
                       window=win, icon=APP_ICON)
     tray.show_message(
-        title="Athany", message="Press 'Minimize' or close to minimize application to system tray")
+        title="Athany", message="Choose 'Hide Window' or close the window to minimize application to system tray")
     return tray
 
 
@@ -330,6 +332,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
         window['-NEXT PRAYER-'].update(
             value=f'{UPCOMING_PRAYERS[0][0]}', font=GUI_FONT+" bold")
         window['-TIME_D-'].update(value=f'{time_d}')
+        window['-CURRENT-TIME-'].update(value=now.strftime("%I:%M %p"))
         # update the current dates
         window['-TODAY-'].update(
             value=now.date().strftime("%a %d %b %y"))
@@ -362,11 +365,11 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
         if event1 in (sg.WIN_CLOSED, "-EXIT-", "Exit"):
             break
 
-        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-MINIMIZE-", "Hide Window"):
+        if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
             window.hide()
             application_tray.show_icon()
             application_tray.show_message(title="Athany minimized to system tray",
-                                          message="To completely close the app, press the 'Exit' button")
+                                          message="To completely close the app, choose the 'Exit' button")
 
         elif event1 in ('Show Window', sg.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
             window.un_hide()
