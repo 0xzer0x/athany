@@ -38,13 +38,8 @@ UPCOMING_PRAYERS = []
 save_loc_check = False
 API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
 FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
-AVAILABLE_ADHANS = ['Default',
-                    'Alaqsa', 'Alaqsa (Takbeer only)',
-                    'Egypt', 'Egypt (Takbeer only)',
-                    'Makkah', 'Makkah (Takbeer only)',
-                    'Abdul-basit Abdul-samad', 'Abdul-basit Abdul-samad (Takbeer only)',
-                    'Mishari Alafasy', 'Mishari Alafasy (Takbeer only)',
-                    'Islam Sobhy', 'Islam Sobhy (Takbeer only)']
+with open(os.path.join(DATA_DIR, 'available_adhans.txt')) as adhans:
+    AVAILABLE_ADHANS = adhans.read().strip().split('\n')
 
 GUI_FONT = "Segoe\ UI 11"
 BUTTON_FONT = "Segoe\ UI 10"
