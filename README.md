@@ -2,7 +2,7 @@
 
 <br>
 
-!(https://github.com/NightSparky/athany-app/blob/master/images/banner.jpg|alt=Athany)
+![Athany](https://github.com/NightSparky/athany-app/blob/master/images/banner.jpg)
 
 <br>
 
