@@ -397,8 +397,8 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                                [sg.Text("Current Athan:", key="-DISPLAYED_MSG-"),
                                 sg.Push(),
                                 sg.Combo(enable_events=True, values=AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=BUTTON_FONT)],
-                               [sg.Button('Download rest of year calender', key='-GET-REST-OF-YEAR-', font=BUTTON_FONT),
-                               sg.Text(key='-REST-OF-YEAR-PROG-',
+                               [sg.Button('Download next 12 months data', key='-GET-NEXT-12-MON-', font=BUTTON_FONT),
+                               sg.Text(key='-DOWN-12-MON-PROG-',
                                        font="Segoe\ UI 8 bold"),
                                sg.Push(),
                                sg.Button("Done", key='-DONE-', font=BUTTON_FONT, pad=(5, 15))]]
@@ -462,18 +462,23 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                 print("[DEBUG] Current athan:",
                       sg.user_settings_get_entry("-athan_sound-"))
 
-            elif event2 == '-GET-REST-OF-YEAR-':
-                mon_d = 1
-                while mon_d + now.month <= 12:
-                    settings_window['-REST-OF-YEAR-PROG-'].update(
-                        value=f'Downloading month {mon_d + now.month} data...')
+            elif event2 == '-GET-NEXT-12-MON-':
+                download_year = now.year
+                for mon_d in range(1, 13):
+                    download_mon = (mon_d + now.month) % 12
+                    if download_mon == 0:
+                        download_mon = 12
+                    elif download_mon <= now.month:
+                        download_year = now.year+1
+                    settings_window['-DOWN-12-MON-PROG-'].update(
+                        value=f'Downloading month {download_mon}-{download_year} data...')
                     settings_window.refresh()
                     fetch_calender_data(sg.user_settings_get_entry('-city-'),
                                         sg.user_settings_get_entry(
                                             '-country-'),
-                                        now.replace(month=mon_d + now.month))
+                                        datetime.datetime(day=1, month=download_mon, year=download_year))
                     mon_d += 1
-                settings_window['-REST-OF-YEAR-PROG-'].update(value='All set!')
+                settings_window['-DOWN-12-MON-PROG-'].update(value='All set!')
 
             elif event2 == "-TOGGLE-GRAPHIC-":
                 settings_window['-TOGGLE-GRAPHIC-'].metadata = not settings_window['-TOGGLE-GRAPHIC-'].metadata
