@@ -1,4 +1,6 @@
-# Athany: a python application to remind you of your purpose
+
+
+![Athany](https://github.com/NightSparky/athany-app/blob/master/images/banner.jpg)
 
 <br>
 
