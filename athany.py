@@ -421,11 +421,11 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                 # get a list of all athans currently in folder as user might have downloaded before
                 DOWNLOADED_ATHANS = os.listdir(ATHANS_DIR)
                 # convert option into filename
-                choosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
+                chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
 
-                if choosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
+                if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
                     sg.user_settings_set_entry('-athan_sound-',
-                                               value=choosen_athan)
+                                               value=chosen_athan)
                     if athan_play_obj:
                         athan_play_obj.stop()
                     athan_play_obj = play_selected_athan()
@@ -439,10 +439,10 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                         athan_play_obj.stop()
 
                     # run the download function to get athan from archive
-                    downloaded = download_athan(choosen_athan)
+                    downloaded = download_athan(chosen_athan)
                     if downloaded:  # if all went well, set as new athan and play audio
                         sg.user_settings_set_entry('-athan_sound-',
-                                                   value=choosen_athan)
+                                                   value=chosen_athan)
                         settings_window['-DISPLAYED_MSG-'].update(
                             value='Current Athan:')
                         settings_window.refresh()
