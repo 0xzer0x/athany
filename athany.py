@@ -540,7 +540,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                 country = values['-COUNTRY-'].strip().capitalize()
 
                 choose_location['-LOC TXT-'].update(
-                    value=f'Fetching prayer times for {city},{country}....')
+                    value=f'Fetching prayer times for {city}, {country}....')
                 choose_location.refresh()
 
                 m_data = fetch_calender_data(city,
@@ -569,7 +569,7 @@ if sg.user_settings_get_entry('-city-') is None and sg.user_settings_get_entry('
                 country = location_api[1]
 
                 choose_location['-LOC TXT-'].update(
-                    value=f'Fetching prayer times for {city},{country}...')
+                    value=f'Fetching prayer times for {city}, {country}...')
                 choose_location.refresh()
 
                 m_data = fetch_calender_data(city,
