@@ -431,8 +431,10 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                     athan_play_obj = play_selected_athan()
 
                 else:  # athan is not on pc, will be downloaded from the internet
+                    settings_window['-DONE-'].update(disabled=True)
+                    settings_window['-GET-NEXT-12-MON-'].update(disabled=True)
                     settings_window['-DISPLAYED_MSG-'].update(
-                        value='Athan downloading...')
+                        value='Establishing connection...')
                     settings_window.refresh()
 
                     if athan_play_obj:
@@ -458,6 +460,9 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                         application_tray.show_message(
                             title="Download Failed", message="Couldn't download athan file, check your internet connection and try again")
 
+                    settings_window['-DONE-'].update(disabled=False)
+                    settings_window['-GET-NEXT-12-MON-'].update(disabled=False)
+                    settings_window.refresh()
                 # Debugging
                 print("[DEBUG] Current athan:",
                       sg.user_settings_get_entry("-athan_sound-"))
