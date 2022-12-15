@@ -455,7 +455,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                         settings_window['-DISPLAYED_MSG-'].update(
                             value='Current Athan:')
                         settings_window['-DROPDOWN-ATHANS-'].update(
-                            value=current_athan)
+                            value=sg.user_settings_get_entry('-athan_sound-').split('.')[0].replace('_', ' '))
                         settings_window.refresh()
                         application_tray.show_message(
                             title="Download Failed", message="Couldn't download athan file, check your internet connection and try again")
