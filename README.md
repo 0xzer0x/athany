@@ -1,6 +1,6 @@
 
 
-![Athany](https://github.com/NightSparky/athany-app/blob/master/images/banner.jpg)
+![Athany](images/banner.jpg)
 
 <br>
 
