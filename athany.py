@@ -71,16 +71,6 @@ def display_ar_text(text: str) -> str:
         return text
 
 
-def GraphicButton(text, key, image_b64, pad=(0, 0)):
-    '''
-    :param text: (str) Text you want to display on the button
-    :param key:  (Any) The key for the button
-    :param image_data: (str) The Base64 image to use on the button
-    :return: (PySimpleGUI.Button) A button with a Base64 image instead of normal tk buttons
-    '''
-    return sg.Button(text, image_source=image_b64, button_color=(sg.theme_background_color(), sg.theme_background_color()), font=BUTTON_FONT, pad=pad, key=key, border_width=0)
-
-
 def download_athan(athan_filename: str) -> bool:
     """Function to download athans from app directory on archive.org
     :param athan_filename: (str) name of .wav file to download from archive.org
@@ -456,13 +446,11 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
                             value='Current Athan:')
                         settings_window['-DROPDOWN-ATHANS-'].update(
                             value=sg.user_settings_get_entry('-athan_sound-').split('.')[0].replace('_', ' '))
-                        settings_window.refresh()
                         application_tray.show_message(
                             title="Download Failed", message="Couldn't download athan file, check your internet connection and try again")
 
                     settings_window['-DONE-'].update(disabled=False)
                     settings_window['-GET-NEXT-12-MON-'].update(disabled=False)
-                    settings_window.refresh()
                 # Debugging
                 print("[DEBUG] Current athan:",
                       sg.user_settings_get_entry("-athan_sound-"))
