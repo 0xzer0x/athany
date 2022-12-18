@@ -1,8 +1,9 @@
-**
-Data/Athans/**
-!Data/available_adhans.txt
-!Data/*.dat
-!Data/Athans/Default.wav
+images
+*.py
+*.txt
+*.zip
 !athany.py
-!README.md
 !requirements.txt
+Data/*.json
+Data/Athans/*
+!Data/Athans/Default.wav
