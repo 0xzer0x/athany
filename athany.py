@@ -47,6 +47,8 @@ ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesettin
 
 with open(os.path.join(DATA_DIR, "app_icon.dat"), mode='rb') as icon:
     APP_ICON = icon.read()
+with open(os.path.join(DATA_DIR, "settings.dat"), mode='rb') as icon:
+    SETTINGS_ICON = icon.read()
 with open(os.path.join(DATA_DIR, 'download.dat'), mode="rb") as down:
     DOWNLOAD_ICON_B64 = down.read()
 with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode='rb') as toff:
@@ -97,6 +99,7 @@ def download_athan(athan_filename: str) -> bool:
                 athan_file.write(chunk)
 
                 prog_e, prog_v = prog_win.read(timeout=10)
+                prog_win.make_modal()
                 if prog_e in (sg.WIN_CLOSE_ATTEMPTED_EVENT, 'Cancel'):
                     prog_win.close()
                     del prog_win
@@ -395,7 +398,7 @@ def display_main_window(main_win_layout, current_month_data) -> bool:
 
             settings_window = sg.Window("Athany - settings",
                                         settings_layout,
-                                        icon=APP_ICON,
+                                        icon=SETTINGS_ICON,
                                         font=GUI_FONT,
                                         keep_on_top=True)
 

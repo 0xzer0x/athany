@@ -1,7 +1,7 @@
 **
-!Data/*.dat
-!Data/available_adhans.txt
 Data/Athans/**
+!Data/available_adhans.txt
+!Data/*.dat
 !Data/Athans/Default.wav
 !athany.py
 !README.md
