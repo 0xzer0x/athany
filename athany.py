@@ -97,7 +97,7 @@ class Athany():
         try:
             saved_file = os.path.join(self.ATHANS_DIR, athan_filename)
             file_data = requests.get("https://archive.org/download/athany-data/"+athan_filename,
-                                     stream=True, timeout=300)
+                                     stream=True, timeout=10)
             file_size = int(file_data.headers.get('content-length'))
 
             progress_layout = [[sg.Text(f"Downloading {athan_filename} ({file_size//1024} KB) from archive...")],
@@ -129,6 +129,22 @@ class Athany():
         except:
             os.remove(saved_file)
             return False
+    
+    def download_12_months(self):
+        download_year = self.now.year
+        for mon_d in range(1, 13):
+            download_mon = (mon_d + self.now.month) % 12
+            if download_mon == 0:
+                download_mon = 12
+            elif download_mon <= self.now.month:
+                download_year = self.now.year+1
+            downloaded = False
+            while not downloaded:
+                downloaded = not isinstance(self.fetch_calender_data(sg.user_settings_get_entry('-city-'),
+                                                                    sg.user_settings_get_entry('-country-'),
+                                                                    download_mon,
+                                                                    download_year), str)
+            sg.user_settings_set_entry('-last-time-down-12-mons-', value=f"{self.now.month}-{self.now.year}")
 
     def play_current_athan(self) -> simpleaudio.PlayObject:
         """ fetches current settings for athan and plays the corresponding athan
@@ -173,7 +189,7 @@ class Athany():
         if not os.path.exists(json_month_file):
             try:
                 res = requests.get(
-                    self.API_ENDPOINT+f"?city={cit}&country={count}&month={month}&year={year}", timeout=300)
+                    self.API_ENDPOINT+f"?city={cit}&country={count}&month={month}&year={year}", timeout=20)
             except:
                 return "RequestError"
             if res.status_code != 200:  # if invalid city or country, return None instead of filename
@@ -510,7 +526,7 @@ class Athany():
                                    sg.Text(key='-DOWN-12-MON-PROG-',
                                            font="Segoe\ UI 8 bold"),
                                    sg.Push(),
-                                   sg.Button("Done", key='-DONE-', font=self.BUTTON_FONT, pad=(5, 15))]]
+                                   sg.Button("Done", key='-DONE-', font=self.BUTTON_FONT, size=(6,1), pad=(5, 15))]]
 
                 settings_window = sg.Window("Athany - settings",
                                             settings_layout,
@@ -525,7 +541,8 @@ class Athany():
                     win2_active = False
                     self.save_loc_check = settings_window['-TOGGLE-GRAPHIC-'].metadata
                     settings_window.close()
-
+                elif event2 == '-EXIT-':
+                    break
                 elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in self.AVAILABLE_ADHANS:
                     # get a list of all athans currently in folder as user might have downloaded before
                     DOWNLOADED_ATHANS = os.listdir(self.ATHANS_DIR)
@@ -577,24 +594,13 @@ class Athany():
                           sg.user_settings_get_entry("-athan_sound-"))
 
                 elif event2 == '-GET-NEXT-12-MON-':
-                    download_year = self.now.year
-                    for mon_d in range(1, 13):
-                        download_mon = (mon_d + self.now.month) % 12
-                        if download_mon == 0:
-                            download_mon = 12
-                        elif download_mon <= self.now.month:
-                            download_year = self.now.year+1
-                        settings_window['-DOWN-12-MON-PROG-'].update(
-                            value=f'Downloading month {download_mon}-{download_year} data...')
-                        settings_window.refresh()
-                        self.fetch_calender_data(sg.user_settings_get_entry('-city-'),
-                                                 sg.user_settings_get_entry(
-                                                     '-country-'),
-                                                 download_mon,
-                                                 download_year)
-                        mon_d += 1
+                    settings_window.perform_long_operation(self.download_12_months, '-DOWNLOADED-12-MONS-')
                     settings_window['-DOWN-12-MON-PROG-'].update(
-                        value='All set!')
+                            value=f'Downloading data, please wait...')
+                
+                elif event2 == '-DOWNLOADED-12-MONS-':
+                    settings_window['-DOWN-12-MON-PROG-'].update(
+                            value=f'last update: {sg.user_settings_get_entry("-last-time-down-12-mons-")}')
 
                 elif event2 == "-TOGGLE-GRAPHIC-":
                     settings_window['-TOGGLE-GRAPHIC-'].metadata = not settings_window['-TOGGLE-GRAPHIC-'].metadata
