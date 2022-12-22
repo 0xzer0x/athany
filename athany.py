@@ -140,7 +140,7 @@ class Athany():
         play_obj = wave_obj.play()
         return play_obj
 
-    def get_current_location(self) -> tuple[str, str] | str:
+    def get_current_location(self) -> tuple[str, str]:
         """ function that gets the current city and country of the user IP\n
         :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
         """

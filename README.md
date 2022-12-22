@@ -1,5 +1,3 @@
-
-
 ![Athany](images/banner.jpg)
 
 <br>
@@ -14,7 +12,7 @@
  
 ## Requirements
  
-- Python3 (tested on python 3.10 & 3.11)
+- Python3 (tested on python 3.11, 3.10, 3.9, 3.8)
 
 - Internet connection is required **before the Isha prayer of the last day in each month** in order to fetch the new month calender, otherwise it operates offline
 
