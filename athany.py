@@ -58,7 +58,7 @@ class Athany():
             self.AVAILABLE_ADHANS = adhans.read().strip().split('\n')
 
         self.GUI_FONT = "Segoe\ UI 11"
-        self.BUTTON_FONT = "Segoe\ UI 10"
+        self.BUTTON_FONT = "Helvetica 10"
         self.ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode='rb') as icon:
@@ -85,7 +85,7 @@ class Athany():
                                              "RequestError" else "(Internet connection required)", key='-AUTO-LOCATION-'),
                                      sg.Push(), sg.Button("Cancel", key='-CANCEL-', size=(10, 1), font=self.BUTTON_FONT)]]
 
-        self.init_layout = self.get_main_layout_and_tomorrow_prayers(
+        self.set_main_layout_and_tomorrow_prayers(
             self.choose_location_if_not_saved())
     # ------------------------------------- Main Application logic ------------------------------------- #
 
@@ -197,7 +197,7 @@ class Athany():
         text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
         return display_ar_text(text=text)
 
-    def get_main_layout_and_tomorrow_prayers(self, api_res: dict) -> tuple[list, dict]:
+    def set_main_layout_and_tomorrow_prayers(self, api_res: dict) -> tuple[list, dict]:
         """sets the prayer times window layout and sets the inital upcoming prayers on application startup
         :param api_res: (dict) - adhan api month json response as a dictionary
         :return: (Tuple[list, dict]) main window layout based on the timings fetched from api_res, the month api data or the new month api data
@@ -215,6 +215,9 @@ class Athany():
             # replace all prayer times with the next day prayers
             # SPECIAL CASE: if today is the last day in the month, fetch new month calender
             if self.tomorrow.day < self.now.day:
+                self.end_of_month_hijri = self.get_hijri_date_from_json(
+                    self.now, api_res=api_res)
+
                 api_res = self.fetch_calender_data(
                     sg.user_settings_get_entry('-city-'),
                     sg.user_settings_get_entry('-country-'),
@@ -237,6 +240,7 @@ class Athany():
 
             ISHA_PASSED = True
 
+        self.current_m_data = api_res
         # loop through all prayer times to convert timing to datetime objects to be able to preform operations on them
         for k, v in current_times.items():
             # to adjust the day,month, year of the prayer datetime object
@@ -246,7 +250,7 @@ class Athany():
                 t, "%H:%M %d %m %Y")
 
         print(" DEBUG ".center(50, "="))
-        initial_layout = [
+        self.init_layout = [
             [sg.Text(key="-TODAY-", font=self.GUI_FONT+" bold"),
              sg.Push(),
              sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 6"),
@@ -263,26 +267,22 @@ class Athany():
         for prayer, time in current_times.items():  # append upcoming prayers to list
             # setting the main window layout with the inital prayer times
             if prayer in self.FUROOD_NAMES or prayer == "Sunrise":
-                initial_layout.append([sg.Text(f"{prayer}:", font=self.GUI_FONT), sg.Push(),
-                                       sg.Text(f"{time.strftime('%I:%M %p')}", font=self.GUI_FONT, key=f"-{prayer.upper()} TIME-")])
+                self.init_layout.append([sg.Text(f"{prayer}:", font=self.GUI_FONT), sg.Push(),
+                                         sg.Text(f"{time.strftime('%I:%M %p')}", font=self.GUI_FONT, key=f"-{prayer.upper()} TIME-")])
 
                 print(prayer, time)  # Debugging
                 if self.now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
                     self.UPCOMING_PRAYERS.append([prayer, time])
 
         # the rest of the main window layout
-        initial_layout += [[sg.HorizontalSeparator(color="dark brown")],
-                           [sg.Button("Settings", key='-SETTINGS-', font=self.BUTTON_FONT),
-                            sg.Button("Stop athan", key='-STOP-ATHAN-',
-                                      font=self.BUTTON_FONT),
-                            sg.Push(),
-                            sg.Text("Current time", font="consolas 10"), sg.Text("~", font="consolas 10"), sg.Text(key='-CURRENT-TIME-', font="consolas 10")]]
+        self.init_layout += [[sg.HorizontalSeparator(color="dark brown")],
+                             [sg.Button("Settings", key='-SETTINGS-', font=self.BUTTON_FONT),
+                              sg.Button("Stop athan", key='-STOP-ATHAN-',
+                                        font=self.BUTTON_FONT),
+                              sg.Push(),
+                              sg.Text("Current time", font="consolas 10"), sg.Text("~", font="consolas 10"), sg.Text(key='-CURRENT-TIME-', font="consolas 10")]]
 
         print("="*50)
-
-        self.current_m_data = api_res
-
-        return initial_layout
 
     # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
 
@@ -407,7 +407,6 @@ class Athany():
         application_tray = self.start_system_tray(win=window)
         win2_active = False
         athan_play_obj = None
-        end_of_month_hijri = None
         while True:
             self.now = datetime.datetime.now().replace(microsecond=0)
 
@@ -428,7 +427,7 @@ class Athany():
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
-                    self.get_main_layout_and_tomorrow_prayers(
+                    self.set_main_layout_and_tomorrow_prayers(
                         self.fetch_calender_data(sg.user_settings_get_entry('-city-'),
                                                  sg.user_settings_get_entry(
                                                      '-country-'),
@@ -453,23 +452,12 @@ class Athany():
                 value=self.now.date().strftime("%a %d %b %y"))
 
             if self.now.month == self.UPCOMING_PRAYERS[0][1].month:
-                end_of_month_hijri = None
+                self.end_of_month_hijri = None
                 window['-TODAY_HIJRI-'].update(
                     value=self.get_hijri_date_from_json(self.now, api_res=self.current_m_data))
 
-            else:
-
-                if not end_of_month_hijri:
-                    end_of_month_hijri = self.get_hijri_date_from_json(self.now,
-                                                                       api_res=self.fetch_calender_data(
-                                                                           sg.user_settings_get_entry(
-                                                                               '-city-'),
-                                                                           sg.user_settings_get_entry(
-                                                                               '-country-'),
-                                                                           self.now.month,
-                                                                           self.now.year))
-
-                window['-TODAY_HIJRI-'].update(value=end_of_month_hijri)
+            else:  # self.end_of_month_hijri will be set by the upcoming prayers function after Isha
+                window['-TODAY_HIJRI-'].update(value=self.end_of_month_hijri)
             # update system tray tooltip also
             application_tray.set_tooltip(
                 f"Next prayer: {self.UPCOMING_PRAYERS[0][0]} in {time_d}")
@@ -505,19 +493,19 @@ class Athany():
                 win2_active = True
                 current_athan = sg.user_settings_get_entry(
                     '-athan_sound-').split('.')[0].replace("_", " ")
-                settings_layout = [[sg.Text("Mute athan"),
+                settings_layout = [[sg.Text("Mute athan", pad=(5,0)),
                                     sg.Push(),
                                     sg.Button(image_data=self.TOGGLE_ON_B64 if sg.user_settings_get_entry('-mute-athan-') else self.TOGGLE_OFF_B64,
-                                              key='-TOGGLE-MUTE-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                              key='-TOGGLE-MUTE-', pad=(5,0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
                                               border_width=0, metadata=sg.user_settings_get_entry('-mute-athan-'))],
-                                   [sg.Text(f"Save location ({sg.user_settings_get_entry('-city-')}, {sg.user_settings_get_entry('-country-')})"),
+                                   [sg.Text(f"Save location ({sg.user_settings_get_entry('-city-')}, {sg.user_settings_get_entry('-country-')})", pad=(5,0)),
                                    sg.Push(),
                                    sg.Button(image_data=self.TOGGLE_ON_B64 if self.save_loc_check else self.TOGGLE_OFF_B64,
                                              key='-TOGGLE-GRAPHIC-', button_color=(sg.theme_background_color(), sg.theme_background_color()),
-                                             border_width=0, metadata=self.save_loc_check)],
-                                   [sg.Text("Current Athan:", key="-DISPLAYED_MSG-"),
+                                             border_width=0, pad=(5,0), metadata=self.save_loc_check)],
+                                   [sg.Text("Current Athan:", key="-DISPLAYED_MSG-",pad=(5,10)),
                                    sg.Push(),
-                                   sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=self.BUTTON_FONT)],
+                                   sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=self.BUTTON_FONT, pad=(5,10))],
                                    [sg.Button('Download next 12 months data', key='-GET-NEXT-12-MON-', font=self.BUTTON_FONT),
                                    sg.Text(key='-DOWN-12-MON-PROG-',
                                            font="Segoe\ UI 8 bold"),
