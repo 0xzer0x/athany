@@ -559,7 +559,7 @@ class Athany():
                     [
                         sg.Button("Download next 12 months data",
                                   key="-GET-NEXT-12-MON-", font=self.BUTTON_FONT),
-                        sg.Text(key="-DOWN-12-MON-PROG-",
+                        sg.Text(f"last update: {self.settings['-last-time-down-12-mons-']}", key="-DOWN-12-MON-PROG-",
                                 font="Segoe\ UI 8 bold"),
                         sg.Push(),
                         sg.Button("Done", key="-DONE-",
