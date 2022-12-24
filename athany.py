@@ -29,6 +29,15 @@ def display_ar_text(text: str) -> str:
         return text
 
 
+def keep_trying_popup(text="A connection error occurred, Do you want to try again?"):
+    ans, _ = sg.Window("Try Again?", [[sg.T(text)],
+                                      [sg.Yes(s=10), sg.No(s=10)]], disable_close=True).read(close=True)
+    if ans == "Yes":
+        return True
+    else:
+        return False
+
+
 class Athany():
     """Python application to fetch prayer times, display them in a GUI and play adhan"""
     # ------------------------------------- Application Settings ------------------------------------- #
@@ -44,11 +53,12 @@ class Athany():
             os.mkdir(self.ATHANS_DIR)
 
         sg.theme("DarkAmber")
-        sg.user_settings_filename(filename="athany-config.json")
-        if not sg.user_settings_get_entry("-athan_sound-") or sg.user_settings_get_entry("-athan_sound-") not in os.listdir(self.ATHANS_DIR):
-            sg.user_settings_set_entry("-athan_sound-", value="Default.wav")
-        if not sg.user_settings_get_entry("-mute-athan-"):
-            sg.user_settings_set_entry("-mute-athan-", value=False)
+        self.settings = sg.UserSettings(
+            filename="athany-config.json", path=self.DATA_DIR)
+        if not self.settings["-athan-sound-"] or self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
+            self.settings["-athan-sound-"] = "Default.wav"
+        if not self.settings["-mute-athan-"]:
+            self.settings["-mute-athan-"] = False
 
         self.UPCOMING_PRAYERS = []
         self.save_loc_check = False
@@ -147,20 +157,18 @@ class Athany():
                 download_year = self.now.year+1
             downloaded = False
             while not downloaded:
-                downloaded = not isinstance(self.fetch_calender_data(sg.user_settings_get_entry("-city-"),
-                                                                     sg.user_settings_get_entry(
-                                                                         "-country-"),
+                downloaded = not isinstance(self.fetch_calender_data(self.settings["-city-"],
+                                                                     self.settings["-country-"],
                                                                      download_mon,
                                                                      download_year), str)
-            sg.user_settings_set_entry(
-                "-last-time-down-12-mons-", value=f"{self.now.month}-{self.now.year}")
+                self.settings["-last-time-down-12-mons-"] = f"{self.now.month}-{self.now.year}"
 
     def play_current_athan(self) -> simpleaudio.PlayObject:
         """ fetches current settings for athan and plays the corresponding athan
         :return: (simpleaudio.PlayObject) play object to control playback of athan
         """
         current_athan_path = os.path.join(
-            self.ATHANS_DIR, sg.user_settings_get_entry("-athan_sound-"))
+            self.ATHANS_DIR, self.settings["-athan-sound-"])
         wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
         play_obj = wave_obj.play()
         return play_obj
@@ -246,20 +254,27 @@ class Athany():
                     self.now, api_res=api_res)
 
                 api_res = self.fetch_calender_data(
-                    sg.user_settings_get_entry("-city-"),
-                    sg.user_settings_get_entry("-country-"),
+                    self.settings["-city-"],
+                    self.settings["-country-"],
                     self.tomorrow.month,
                     self.tomorrow.year)
 
-                if api_res == "RequestError":
-                    sg.user_settings_delete_entry("-city-")
-                    sg.user_settings_delete_entry("-country-")
-                    sys.exit()
+                while api_res == "RequestError":
+                    keep_trying = keep_trying_popup(
+                        "Couldn't fetch new month data, try again?")
+                    if not keep_trying:
+                        sys.exit()
+                    else:
+                        api_res = self.fetch_calender_data(
+                            self.settings["-city-"],
+                            self.settings["-country-"],
+                            self.tomorrow.month,
+                            self.tomorrow.year)
 
                 current_times = api_res["data"][self.tomorrow.day - 1]["timings"]
                 # remove last month data after setting up the new month json file
                 os.remove(os.path.join(
-                    self.DATA_DIR, f"{self.now.year}-{self.now.month}-{sg.user_settings_get_entry('-city-')}-{sg.user_settings_get_entry('-country-')}.json"
+                    self.DATA_DIR, f"{self.now.year}-{self.now.month}-{self.settings['-city-']}-{self.settings['-country-']}.json"
                 )
                 )
             else:
@@ -317,7 +332,7 @@ class Athany():
         """function to get & set the user location
         :return: (dict) dictionary of the current month json data
         """
-        if sg.user_settings_get_entry("-city-") is None and sg.user_settings_get_entry("-country-") is None:
+        if self.settings["-city-"] is None and self.settings["-country-"] is None:
             # If there are no saved settings, display the choose location window to set these values
             choose_location = sg.Window("Athany - set location",
                                         self.location_win_layout,
@@ -386,10 +401,8 @@ class Athany():
                         choose_location["-LOC TXT-"].update(
                             value="Internet connection required")
                     else:
-                        sg.user_settings_set_entry("-city-",
-                                                   city)
-                        sg.user_settings_set_entry("-country-",
-                                                   country)
+                        self.settings["-city-"] = city
+                        self.settings["-country-"] = country
 
                         self.save_loc_check = values["-SAVE_LOC_CHECK-"]
 
@@ -402,9 +415,8 @@ class Athany():
         else:
             self.save_loc_check = True
             m_data = self.fetch_calender_data(
-                sg.user_settings_get_entry("-city-"),
-                sg.user_settings_get_entry(
-                    "-country-"),
+                self.settings["-city-"],
+                self.settings["-country-"],
                 self.now.month,
                 self.now.year)
 
@@ -448,7 +460,7 @@ class Athany():
 
                 # play athan sound from user athan sound settings (if athan sound not muted)
                     try:
-                        if not sg.user_settings_get_entry("-mute-athan-"):
+                        if not self.settings["-mute-athan-"]:
                             athan_play_obj = self.play_current_athan()
                     except:
                         print(
@@ -456,9 +468,8 @@ class Athany():
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
                     self.set_main_layout_and_tomorrow_prayers(
-                        self.fetch_calender_data(sg.user_settings_get_entry("-city-"),
-                                                 sg.user_settings_get_entry(
-                                                     "-country-"),
+                        self.fetch_calender_data(self.settings["-city-"],
+                                                 self.settings["-country-"],
                                                  self.now.month,
                                                  self.now.year)
                     )
@@ -519,26 +530,42 @@ class Athany():
             # if clicked settings button, open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
-                current_athan = sg.user_settings_get_entry(
-                    "-athan_sound-").split(".")[0].replace("_", " ")
-                settings_layout = [[sg.Text("Mute athan", pad=(5, 0)),
-                                    sg.Push(),
-                                    sg.Button(image_data=self.TOGGLE_ON_B64 if sg.user_settings_get_entry("-mute-athan-") else self.TOGGLE_OFF_B64,
-                                              key="-TOGGLE-MUTE-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
-                                              border_width=0, metadata=sg.user_settings_get_entry("-mute-athan-"))],
-                                   [sg.Text(f"Save location ({sg.user_settings_get_entry('-city-')}, {sg.user_settings_get_entry('-country-')})", pad=(5, 0)),
-                                   sg.Push(),
-                                   sg.Button(image_data=self.TOGGLE_ON_B64 if self.save_loc_check else self.TOGGLE_OFF_B64,
-                                             key="-TOGGLE-GRAPHIC-", button_color=(sg.theme_background_color(), sg.theme_background_color()),
-                                             border_width=0, pad=(5, 0), metadata=self.save_loc_check)],
-                                   [sg.Text("Current Athan:", key="-DISPLAYED_MSG-", pad=(5, 10)),
-                                   sg.Push(),
-                                   sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-", readonly=True, default_value=current_athan, font=self.BUTTON_FONT, pad=(5, 10))],
-                                   [sg.Button("Download next 12 months data", key="-GET-NEXT-12-MON-", font=self.BUTTON_FONT),
-                                   sg.Text(key="-DOWN-12-MON-PROG-",
-                                           font="Segoe\ UI 8 bold"),
-                                   sg.Push(),
-                                   sg.Button("Done", key="-DONE-", font=self.BUTTON_FONT, size=(6, 1), pad=(5, 15))]]
+                current_athan = self.settings["-athan-sound-"]\
+                    .split(".")[0].replace("_", " ")
+
+                settings_layout = [
+                    [
+                        sg.Text("Mute athan", pad=(5, 0)),
+                        sg.Push(),
+                        sg.Button(image_data=self.TOGGLE_ON_B64 if self.settings["-mute-athan-"] else self.TOGGLE_OFF_B64,
+                                  key="-TOGGLE-MUTE-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                  border_width=0, metadata=self.settings["-mute-athan-"])
+                    ],
+                    [
+                        sg.Text(
+                            f"Save location ({self.settings['-city-']}, {self.settings['-country-']})", pad=(5, 0)),
+                        sg.Push(),
+                        sg.Button(image_data=self.TOGGLE_ON_B64 if self.save_loc_check else self.TOGGLE_OFF_B64,
+                                  key="-TOGGLE-GRAPHIC-", button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                  border_width=0, pad=(5, 0), metadata=self.save_loc_check)
+                    ],
+                    [
+                        sg.Text("Current Athan:",
+                                key="-DISPLAYED_MSG-", pad=(5, 10)),
+                        sg.Push(),
+                        sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
+                                 readonly=True, default_value=current_athan, font=self.BUTTON_FONT, pad=(5, 10))
+                    ],
+                    [
+                        sg.Button("Download next 12 months data",
+                                  key="-GET-NEXT-12-MON-", font=self.BUTTON_FONT),
+                        sg.Text(key="-DOWN-12-MON-PROG-",
+                                font="Segoe\ UI 8 bold"),
+                        sg.Push(),
+                        sg.Button("Done", key="-DONE-",
+                                  font=self.BUTTON_FONT, s=6, pad=(5, 15))
+                    ]
+                ]
 
                 settings_window = sg.Window("Athany - settings",
                                             settings_layout,
@@ -562,8 +589,7 @@ class Athany():
                     chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
 
                     if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
-                        sg.user_settings_set_entry("-athan_sound-",
-                                                   value=chosen_athan)
+                        self.settings["-athan-sound-"] = chosen_athan
                         if athan_play_obj:
                             athan_play_obj.stop()
                         athan_play_obj = self.play_current_athan()
@@ -582,8 +608,7 @@ class Athany():
                         # run the download function to get athan from archive
                         downloaded = self.download_athan(chosen_athan)
                         if downloaded:  # if all went well, set as new athan and play audio
-                            sg.user_settings_set_entry("-athan_sound-",
-                                                       value=chosen_athan)
+                            self.settings["-athan-sound-"] = chosen_athan
                             settings_window["-DISPLAYED_MSG-"].update(
                                 value="Current Athan:")
                             settings_window.refresh()
@@ -594,7 +619,7 @@ class Athany():
                             settings_window["-DISPLAYED_MSG-"].update(
                                 value="Current Athan:")
                             settings_window["-DROPDOWN-ATHANS-"].update(
-                                value=sg.user_settings_get_entry("-athan_sound-").split(".")[0].replace("_", " "))
+                                value=self.settings["-athan-sound-"].split(".")[0].replace("_", " "))
                             application_tray.show_message(
                                 title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
 
@@ -603,7 +628,7 @@ class Athany():
                             disabled=False)
                     # Debugging
                     print("[DEBUG] Current athan:",
-                          sg.user_settings_get_entry("-athan_sound-"))
+                          self.settings["-athan-sound-"])
 
                 elif event2 == "-GET-NEXT-12-MON-":
                     settings_window.perform_long_operation(
@@ -613,7 +638,7 @@ class Athany():
 
                 elif event2 == "-DOWNLOADED-12-MONS-":
                     settings_window["-DOWN-12-MON-PROG-"].update(
-                        value=f"last update: {sg.user_settings_get_entry('-last-time-down-12-mons-')}")
+                        value=f"last update: {self.settings['-last-time-down-12-mons-']}")
 
                 elif event2 == "-TOGGLE-GRAPHIC-":
                     settings_window["-TOGGLE-GRAPHIC-"].metadata = not settings_window["-TOGGLE-GRAPHIC-"].metadata
@@ -624,8 +649,8 @@ class Athany():
                     settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
                     settings_window["-TOGGLE-MUTE-"].update(
                         image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else self.TOGGLE_OFF_B64)
-                    sg.user_settings_set_entry("-mute-athan-",
-                                               value=settings_window["-TOGGLE-MUTE-"].metadata)
+
+                    self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
         # close application on exit
         application_tray.close()
         window.close()
@@ -636,8 +661,8 @@ class Athany():
 # ------------------------------------- Starts The GUI ------------------------------------- #
 
 if __name__ == "__main__":
-    keep_trying = "Yes"
-    while keep_trying != "No":
+    keep_trying = True
+    while keep_trying:
         try:
             app = Athany()
 
@@ -645,11 +670,10 @@ if __name__ == "__main__":
 
             # If user doesn't want to save settings, delete saved entries before closing
             if not app.save_loc_check:
-                if sg.user_settings_get_entry("-city-") and sg.user_settings_get_entry("-country-"):
-                    sg.user_settings_delete_entry("-city-")
-                    sg.user_settings_delete_entry("-country-")
+                if app.settings["-city-"] and app.settings["-country-"]:
+                    app.settings.delete_entry("-city-")
+                    app.settings.delete_entry("-country-")
 
-            keep_trying = "No"
+            keep_trying = False
         except TypeError:
-            keep_trying, _ = sg.Window("Try Again?", [[sg.T("A connection error occurred, Do you want to try again?")],
-                                                      [sg.Yes(s=10), sg.No(s=10)]], disable_close=True).read(close=True)
+            keep_trying = keep_trying_popup()
