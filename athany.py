@@ -84,15 +84,14 @@ class Athany():
 
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
-        self.location_api = self.get_current_location()
+        self.location_api = None
         self.location_win_layout = [[sg.Text("Set your location", size=(50, 1), key="-LOC TXT-")],
                                     [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
                                      sg.Text("Country"), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key="-SAVE_LOC_CHECK-")],
                                     [sg.Button("Ok", key="-OK-", size=(10, 1), font=self.BUTTON_FONT, bind_return_key=True),
                                      sg.Button(
                                          "Use current location", key="-USE-CURRENT-LOCATION-", font=self.BUTTON_FONT),
-                                     sg.Text(f"({self.location_api[0]}, {self.location_api[1]})" if self.location_api !=
-                                             "RequestError" else "(Internet connection required)", key="-AUTO-LOCATION-"),
+                                     sg.Text(key="-AUTO-LOCATION-"),
                                      sg.Push(), sg.Button("Cancel", key="-CANCEL-", size=(10, 1), font=self.BUTTON_FONT)]]
 
         self.set_main_layout_and_tomorrow_prayers(
@@ -340,8 +339,11 @@ class Athany():
             choose_location = sg.Window("Athany - set location",
                                         self.location_win_layout,
                                         icon=self.APP_ICON,
-                                        font=self.GUI_FONT)
+                                        font=self.GUI_FONT,
+                                        finalize=True)
 
+            choose_location.perform_long_operation(
+                self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
             while True:
                 m_data = False
                 event, values = choose_location.read()
@@ -351,6 +353,10 @@ class Athany():
                     del choose_location
                     sys.exit()
 
+                elif event == "-AUTOMATIC-LOCATION-THREAD-":
+                    self.location_api = values["-AUTOMATIC-LOCATION-THREAD-"]
+                    choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
+                        self.location_api, str) else "(Internet connection required)")
                 else:
                     if event == "-OK-" and values["-CITY-"].strip() and values["-COUNTRY-"].strip():
                         city = values["-CITY-"].strip().capitalize()
@@ -377,8 +383,8 @@ class Athany():
                             continue
 
                     elif event == "-USE-CURRENT-LOCATION-":
-                        self.location_api = self.get_current_location(
-                        ) if self.location_api == "RequestError" else self.location_api
+                        if not isinstance(self.location_api, tuple):
+                            self.location_api = self.get_current_location()
                         if self.location_api == "RequestError":
                             choose_location["-LOC TXT-"].update(
                                 value="An error occurred, try entering location manually")
