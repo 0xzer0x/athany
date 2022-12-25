@@ -131,6 +131,7 @@ class Athany():
                     prog_e = prog_win.read(timeout=10)[0]
                     prog_win.make_modal()
                     if prog_e in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Cancel"):
+                        file_data.close()
                         raise Exception
 
                     prog_win["-PROGRESS-METER-"].update(current_count=dl)
@@ -148,20 +149,22 @@ class Athany():
             return False
 
     def download_12_months(self):
-        download_year = self.now.year
-        for mon_d in range(1, 13):
-            download_mon = (mon_d + self.now.month) % 12
-            if download_mon == 0:
-                download_mon = 12
-            elif download_mon <= self.now.month:
-                download_year = self.now.year+1
-            downloaded = False
-            while not downloaded:
-                downloaded = not isinstance(self.fetch_calender_data(self.settings["-city-"],
-                                                                     self.settings["-country-"],
-                                                                     download_mon,
-                                                                     download_year), str)
-                self.settings["-last-time-down-12-mons-"] = f"{self.now.month}-{self.now.year}"
+        """function that downloads api data for the next 12 months"""
+        if self.settings["-last-time-down-12-mons-"] != f"{self.now.month}-{self.now.year}":
+            download_year = self.now.year
+            for mon_d in range(1, 13):
+                download_mon = (mon_d + self.now.month) % 12
+                if download_mon == 0:
+                    download_mon = 12
+                elif download_mon <= self.now.month:
+                    download_year = self.now.year+1
+                downloaded = False
+                while not downloaded:
+                    downloaded = not isinstance(self.fetch_calender_data(self.settings["-city-"],
+                                                                         self.settings["-country-"],
+                                                                         download_mon,
+                                                                         download_year), str)
+                    self.settings["-last-time-down-12-mons-"] = f"{self.now.month}-{self.now.year}"
 
     def play_current_athan(self) -> simpleaudio.PlayObject:
         """ fetches current settings for athan and plays the corresponding athan
@@ -235,7 +238,6 @@ class Athany():
     def set_main_layout_and_tomorrow_prayers(self, api_res: dict) -> tuple[list, dict]:
         """sets the prayer times window layout and sets the inital upcoming prayers on application startup
         :param api_res: (dict) - adhan api month json response as a dictionary
-        :return: (Tuple[list, dict]) main window layout based on the timings fetched from api_res, the month api data or the new month api data
         """
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
