@@ -486,6 +486,11 @@ class Athany():
                         window[f"-{f.upper()} TIME-"].update(font=self.GUI_FONT,
                                                              text_color=sg.theme_text_color())
 
+                window["-SUNRISE-"].update(font=self.GUI_FONT,
+                                           text_color=sg.theme_text_color())
+                window["-SUNRISE TIME-"].update(font=self.GUI_FONT,
+                                                text_color=sg.theme_text_color())
+
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
                     self.set_main_layout_and_tomorrow_prayers(
