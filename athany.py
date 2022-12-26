@@ -67,9 +67,13 @@ class Athany():
         with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
             self.AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
-        self.ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
+        if sys.platform == "win32":
+            self.ARABIC_FONT = "Arabic\ Typesetting 20"
+            self.MONO_FONT = "consolas 10"
+        else:
+            self.ARABIC_FONT = "Segoe\ UI 12"
+            self.MONO_FONT = "Hack 9"
         self.GUI_FONT = "Segoe\ UI 11"
-        self.MONO_FONT = "Hack 9" if sys.platform != "win32" else "consolas 10"
         self.BUTTON_FONT = "Helvetica 10"
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode="rb") as icon:
@@ -85,6 +89,7 @@ class Athany():
 
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
+        self.download_thread_active = False
         self.current_fard = None
         self.location_api = None
         self.location_win_layout = [[sg.Text("Set your location", size=(50, 1), key="-LOC TXT-")],
@@ -151,7 +156,8 @@ class Athany():
 
     def download_12_months(self):
         """function that downloads api data for the next 12 months"""
-        if self.settings["-last-time-down-12-mons-"] != f"{self.now.month}-{self.now.year}":
+        if not self.download_thread_active and self.settings["-last-time-down-12-mons-"] != f"{self.now.month}-{self.now.year}":
+            self.download_thread_active = True
             download_year = self.now.year
             for mon_d in range(1, 13):
                 download_mon = (mon_d + self.now.month) % 12
@@ -167,6 +173,7 @@ class Athany():
                                                                          download_year), str)
 
             self.settings["-last-time-down-12-mons-"] = f"{self.now.month}-{self.now.year}"
+            self.download_thread_active = False
 
     def play_current_athan(self) -> simpleaudio.PlayObject:
         """ fetches current settings for athan and plays the corresponding athan
@@ -479,17 +486,12 @@ class Athany():
                         print(
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
 
-                for f in self.FUROOD_NAMES:
+                for f in self.FUROOD_NAMES+["Sunrise"]:
                     if f != self.current_fard[0]:
                         window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
                                                         text_color=sg.theme_text_color())
                         window[f"-{f.upper()} TIME-"].update(font=self.GUI_FONT,
                                                              text_color=sg.theme_text_color())
-
-                window["-SUNRISE-"].update(font=self.GUI_FONT,
-                                           text_color=sg.theme_text_color())
-                window["-SUNRISE TIME-"].update(font=self.GUI_FONT,
-                                                text_color=sg.theme_text_color())
 
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
@@ -589,7 +591,7 @@ class Athany():
                     ],
                     [
                         sg.Button("Download next 12 months data",
-                                  key="-GET-NEXT-12-MON-", font=self.BUTTON_FONT),
+                                  key="-GET-NEXT-12-MON-", disabled=self.download_thread_active, font=self.BUTTON_FONT),
                         sg.Text(f"last update: {self.settings['-last-time-down-12-mons-']}", key="-DOWN-12-MON-PROG-",
                                 font="Segoe\ UI 8 bold"),
                         sg.Push(),
@@ -664,10 +666,14 @@ class Athany():
                 elif event2 == "-GET-NEXT-12-MON-":
                     settings_window.perform_long_operation(
                         self.download_12_months, "-DOWNLOADED-12-MONS-")
+                    settings_window["-GET-NEXT-12-MON-"].update(
+                        disabled=True)
                     settings_window["-DOWN-12-MON-PROG-"].update(
                         value="Downloading data, please wait...")
 
                 elif event2 == "-DOWNLOADED-12-MONS-":
+                    settings_window["-GET-NEXT-12-MON-"].update(
+                        disabled=False)
                     settings_window["-DOWN-12-MON-PROG-"].update(
                         value=f"last update: {self.settings['-last-time-down-12-mons-']}")
 
