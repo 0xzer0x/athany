@@ -67,9 +67,10 @@ class Athany():
         with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
             self.AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
-        self.GUI_FONT = "Segoe\ UI 11"
-        self.BUTTON_FONT = "Helvetica 10"
         self.ARABIC_FONT = "Segoe\ UI 12" if sys.platform != "win32" else "Arabic\ Typesetting 20"
+        self.GUI_FONT = "Segoe\ UI 11"
+        self.MONO_FONT = "Hack 9" if sys.platform != "win32" else "consolas 10"
+        self.BUTTON_FONT = "Helvetica 10"
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode="rb") as icon:
             self.APP_ICON = icon.read()
@@ -84,6 +85,7 @@ class Athany():
 
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
+        self.current_fard = None
         self.location_api = None
         self.location_win_layout = [[sg.Text("Set your location", size=(50, 1), key="-LOC TXT-")],
                                     [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
@@ -311,12 +313,14 @@ class Athany():
         for prayer, time in current_times.items():  # append upcoming prayers to list
             # setting the main window layout with the inital prayer times
             if prayer in self.FUROOD_NAMES or prayer == "Sunrise":
-                self.init_layout.append([sg.Text(f"{prayer}:", font=self.GUI_FONT), sg.Push(),
+                self.init_layout.append([sg.Text(f"{prayer}:", font=self.GUI_FONT, key=f"-{prayer.upper()}-"), sg.Push(),
                                          sg.Text(f"{time.strftime('%I:%M %p')}", font=self.GUI_FONT, key=f"-{prayer.upper()} TIME-")])
 
                 print(prayer, time)  # Debugging
                 if self.now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
                     self.UPCOMING_PRAYERS.append([prayer, time])
+                else:
+                    self.current_fard = [prayer, time]
 
         # the rest of the main window layout
         self.init_layout += [[sg.HorizontalSeparator(color="dark brown")],
@@ -324,10 +328,12 @@ class Athany():
                               sg.Button("Stop athan", key="-STOP-ATHAN-",
                                         font=self.BUTTON_FONT),
                               sg.Push(),
-                              sg.Text("Current time", font="consolas 10"), sg.Text("~", font="consolas 10"), sg.Text(key="-CURRENT-TIME-", font="consolas 10")]]
+                              sg.Text("current time", font=self.MONO_FONT), sg.Text("~", font=self.MONO_FONT), sg.Text(key="-CURRENT-TIME-", font=self.MONO_FONT)]]
+
+        if not self.current_fard:
+            self.current_fard = ["Isha", current_times["Isha"]]
 
         print("="*50)
-
     # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
 
     def choose_location_if_not_saved(self) -> dict:
@@ -339,8 +345,7 @@ class Athany():
             choose_location = sg.Window("Athany - set location",
                                         self.location_win_layout,
                                         icon=self.APP_ICON,
-                                        font=self.GUI_FONT,
-                                        finalize=True)
+                                        font=self.GUI_FONT)
 
             choose_location.perform_long_operation(
                 self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
@@ -461,19 +466,27 @@ class Athany():
 
             if self.now >= self.UPCOMING_PRAYERS[0][1]:
                 # remove current fard from list, update remaining time to be 0 before playing athan sound
-                fard = self.UPCOMING_PRAYERS.pop(0)
+                self.current_fard = self.UPCOMING_PRAYERS.pop(0)
 
-                if fard[0] != "Sunrise":
+                if self.current_fard[0] != "Sunrise":
                     application_tray.show_message(
-                        title="Athany", message=f"It's time for {fard[0]} prayer 🕌")
+                        title="Athany", message=f"It's time for {self.current_fard[0]} prayer 🕌")
 
-                # play athan sound from user athan sound settings (if athan sound not muted)
+                    # play athan sound from user athan sound settings (if athan sound not muted)
                     try:
                         if not self.settings["-mute-athan-"]:
                             athan_play_obj = self.play_current_athan()
                     except:
                         print(
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
+
+                    for f in self.FUROOD_NAMES:
+                        if f != self.current_fard[0]:
+                            window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
+                                                            text_color=sg.theme_text_color())
+                            window[f"-{f.upper()} TIME-"].update(font=self.GUI_FONT,
+                                                                 text_color=sg.theme_text_color())
+
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
                     self.set_main_layout_and_tomorrow_prayers(
@@ -490,8 +503,13 @@ class Athany():
             time_d = self.UPCOMING_PRAYERS[0][1] - self.now
 
             # update the main window with the next prayer and remaining time
+            window[f"-{self.current_fard[0].upper()}-"].update(
+                font=self.GUI_FONT+" italic", text_color='#cd8032')
+            window[f"-{self.current_fard[0].upper()} TIME-"].update(
+                font=self.GUI_FONT+" italic", text_color='#cd8032')
             window["-NEXT PRAYER-"].update(
                 value=f"{self.UPCOMING_PRAYERS[0][0]}", font=self.GUI_FONT+" bold")
+
             window["-TIME_D-"].update(value=f"{time_d}")
             window["-CURRENT-TIME-"].update(
                 value=self.now.strftime("%I:%M %p"))
@@ -674,7 +692,6 @@ if __name__ == "__main__":
     while keep_trying:
         try:
             app = Athany()
-
             app.display_main_window(app.init_layout)
 
             # If user doesn't want to save settings, delete saved entries before closing
