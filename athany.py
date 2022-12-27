@@ -109,15 +109,15 @@ class Athany():
     # ------------------------------------- Main Application logic ------------------------------------- #
 
     def download_athan(self, athan_filename: str) -> bool:
-        """Function to download athans from app directory on archive.org
-        :param athan_filename: (str) name of .wav file to download from archive.org
+        """Function to download athans from app bucket
+        :param athan_filename: (str) name of .wav file to download from bucket
         :return: (bool) True if the download completed successfully without errors, False otherwise
         """
         try:
             prog_win = None
             saved_file = os.path.join(self.ATHANS_DIR, athan_filename)
             with open(saved_file, "wb") as athan_file:
-                file_data = requests.get("https://archive.org/download/athany-data/"+athan_filename,
+                file_data = requests.get("https://s3.us-east-1.amazonaws.com/athany-data/"+athan_filename,
                                          stream=True, timeout=10)
                 file_size = int(file_data.headers.get("content-length"))
 
@@ -176,6 +176,7 @@ class Athany():
                                                                          download_year), str)
 
             self.settings["-last-time-down-12-mons-"][f"{self.settings['-city-']}-{self.settings['-country-']}"] = f"{self.now.month}-{self.now.year}"
+            self.settings.save()
             self.download_thread_active = False
 
     def play_current_athan(self) -> simpleaudio.PlayObject:
@@ -633,8 +634,6 @@ class Athany():
 
                     else:  # athan is not on pc, will be downloaded from the internet
                         settings_window["-DONE-"].update(disabled=True)
-                        settings_window["-GET-NEXT-12-MON-"].update(
-                            disabled=True)
                         settings_window["-DISPLAYED_MSG-"].update(
                             value="Establishing connection...")
                         settings_window.refresh()
@@ -661,8 +660,6 @@ class Athany():
                                 title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
 
                         settings_window["-DONE-"].update(disabled=False)
-                        settings_window["-GET-NEXT-12-MON-"].update(
-                            disabled=False)
                     # Debugging
                     print("[DEBUG] Current athan:",
                           self.settings["-athan-sound-"])
@@ -677,8 +674,6 @@ class Athany():
                         value="Downloading data, please wait...")
 
                 elif event2 == "-DOWNLOADED-12-MONS-":
-                    settings_window["-GET-NEXT-12-MON-"].update(
-                        disabled=False)
                     settings_window["-DOWN-12-MON-PROG-"].update(
                         value="Download completed successfully")
 
