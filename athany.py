@@ -31,7 +31,7 @@ def display_ar_text(text: str) -> str:
 
 def keep_trying_popup(text="A connection error occurred, Do you want to try again?"):
     ans, _ = sg.Window("Try Again?", [[sg.T(text)],
-                                      [sg.Yes(s=10), sg.No(s=10)]], disable_close=True).read(close=True)
+                                      [sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
     if ans == "Yes":
         return True
     else:
@@ -59,6 +59,8 @@ class Athany():
             self.settings["-athan-sound-"] = "Default.wav"
         if not self.settings["-mute-athan-"]:
             self.settings["-mute-athan-"] = False
+        if not self.settings["-last-time-down-12-mons-"]:
+            self.settings["-last-time-down-12-mons-"] = dict()
 
         self.UPCOMING_PRAYERS = []
         self.save_loc_check = False
@@ -87,6 +89,7 @@ class Athany():
         with open(os.path.join(self.DATA_DIR, "toggle_on.dat"), mode="rb") as ton:
             self.TOGGLE_ON_B64 = ton.read()
 
+        sg.set_global_icon(self.APP_ICON)
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
         self.download_thread_active = False
@@ -156,7 +159,7 @@ class Athany():
 
     def download_12_months(self):
         """function that downloads api data for the next 12 months"""
-        if not self.download_thread_active and self.settings["-last-time-down-12-mons-"] != f"{self.now.month}-{self.now.year}":
+        if not self.download_thread_active:
             self.download_thread_active = True
             download_year = self.now.year
             for mon_d in range(1, 13):
@@ -172,7 +175,7 @@ class Athany():
                                                                          download_mon,
                                                                          download_year), str)
 
-            self.settings["-last-time-down-12-mons-"] = f"{self.now.month}-{self.now.year}"
+            self.settings["-last-time-down-12-mons-"][f"{self.settings['-city-']}-{self.settings['-country-']}"] = f"{self.now.month}-{self.now.year}"
             self.download_thread_active = False
 
     def play_current_athan(self) -> simpleaudio.PlayObject:
@@ -351,7 +354,6 @@ class Athany():
             # If there are no saved settings, display the choose location window to set these values
             choose_location = sg.Window("Athany - set location",
                                         self.location_win_layout,
-                                        icon=self.APP_ICON,
                                         font=self.GUI_FONT)
 
             choose_location.perform_long_operation(
@@ -461,7 +463,6 @@ class Athany():
         """
         window = sg.Window("Athany: a python athan app",
                            main_win_layout,
-                           icon=self.APP_ICON,
                            enable_close_attempted_event=True,
                            finalize=True)
 
@@ -508,28 +509,31 @@ class Athany():
             # get remaining time till next prayer
             time_d = self.UPCOMING_PRAYERS[0][1] - self.now
 
-            # update the main window with the next prayer and remaining time
+            # Highlight current fard in main window
             window[f"-{self.current_fard[0].upper()}-"].update(
                 font=self.GUI_FONT+" italic", text_color='#cd8032')
             window[f"-{self.current_fard[0].upper()} TIME-"].update(
                 font=self.GUI_FONT+" italic", text_color='#cd8032')
+
+            # update the main window with the next prayer and remaining time
             window["-NEXT PRAYER-"].update(
                 value=f"{self.UPCOMING_PRAYERS[0][0]}", font=self.GUI_FONT+" bold")
-
             window["-TIME_D-"].update(value=f"{time_d}")
+
+            # update the current dates
             window["-CURRENT-TIME-"].update(
                 value=self.now.strftime("%I:%M %p"))
-            # update the current dates
             window["-TODAY-"].update(
                 value=self.now.date().strftime("%a %d %b %y"))
 
+            # update hijri date from api response
             if self.now.month == self.UPCOMING_PRAYERS[0][1].month:
                 self.end_of_month_hijri = None
                 window["-TODAY_HIJRI-"].update(
                     value=self.get_hijri_date_from_json(self.now, api_res=self.current_m_data))
-
             else:  # self.end_of_month_hijri will be set by the upcoming prayers function after Isha
                 window["-TODAY_HIJRI-"].update(value=self.end_of_month_hijri)
+
             # update system tray tooltip also
             application_tray.set_tooltip(
                 f"Next prayer: {self.UPCOMING_PRAYERS[0][0]} in {time_d}")
@@ -565,6 +569,8 @@ class Athany():
                 win2_active = True
                 current_athan = self.settings["-athan-sound-"]\
                     .split(".")[0].replace("_", " ")
+                last_time_down_12_mons = self.settings['-last-time-down-12-mons-'].get(
+                    f"{self.settings['-city-']}-{self.settings['-country-']}", "never")
 
                 settings_layout = [
                     [
@@ -591,8 +597,8 @@ class Athany():
                     ],
                     [
                         sg.Button("Download next 12 months data",
-                                  key="-GET-NEXT-12-MON-", disabled=self.download_thread_active, font=self.BUTTON_FONT),
-                        sg.Text(f"last update: {self.settings['-last-time-down-12-mons-']}", key="-DOWN-12-MON-PROG-",
+                                  key="-GET-NEXT-12-MON-", disabled=self.download_thread_active or last_time_down_12_mons == f"{self.now.month}-{self.now.year}", font=self.BUTTON_FONT),
+                        sg.Text(f"last updated: {last_time_down_12_mons}", key="-DOWN-12-MON-PROG-",
                                 font="Segoe\ UI 8 bold"),
                         sg.Push(),
                         sg.Button("Done", key="-DONE-",
@@ -613,8 +619,6 @@ class Athany():
                     win2_active = False
                     self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
                     settings_window.close()
-                elif event2 == "-EXIT-":
-                    break
                 elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in self.AVAILABLE_ADHANS:
                     # get a list of all athans currently in folder as user might have downloaded before
                     DOWNLOADED_ATHANS = os.listdir(self.ATHANS_DIR)
@@ -663,6 +667,7 @@ class Athany():
                     print("[DEBUG] Current athan:",
                           self.settings["-athan-sound-"])
 
+                # this event will fire only if the button is enabled, the button won't be enabled if there's a thread already downloading this data or the function has already been called this month
                 elif event2 == "-GET-NEXT-12-MON-":
                     settings_window.perform_long_operation(
                         self.download_12_months, "-DOWNLOADED-12-MONS-")
@@ -675,7 +680,7 @@ class Athany():
                     settings_window["-GET-NEXT-12-MON-"].update(
                         disabled=False)
                     settings_window["-DOWN-12-MON-PROG-"].update(
-                        value=f"last update: {self.settings['-last-time-down-12-mons-']}")
+                        value="Download completed successfully")
 
                 elif event2 == "-TOGGLE-GRAPHIC-":
                     settings_window["-TOGGLE-GRAPHIC-"].metadata = not settings_window["-TOGGLE-GRAPHIC-"].metadata
@@ -688,6 +693,7 @@ class Athany():
                         image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else self.TOGGLE_OFF_B64)
 
                     self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
+
         # close application on exit
         application_tray.close()
         window.close()
