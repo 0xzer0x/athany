@@ -29,7 +29,8 @@ def display_ar_text(text: str) -> str:
         return text
 
 
-def keep_trying_popup(text="A connection error occurred, Do you want to try again?"):
+def keep_trying_popup(text="An error occurred, Do you want to restart the application?"):
+    """function to display an error window & prompt the user to try again"""
     ans, _ = sg.Window("Try Again?", [[sg.T(text)],
                                       [sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
     if ans == "Yes":
@@ -40,7 +41,7 @@ def keep_trying_popup(text="A connection error occurred, Do you want to try agai
 
 class Athany():
     """Python application to fetch prayer times, display them in a GUI and play adhan"""
-    # ------------------------------------- Application Settings ------------------------------------- #
+    # ------------------------------------- Application Settings --------------------------------- #
 
     def __init__(self) -> None:
         self.DATA_DIR = os.path.join(os.path.dirname(
@@ -55,7 +56,8 @@ class Athany():
         sg.theme("DarkAmber")
         self.settings = sg.UserSettings(
             filename="athany-config.json", path=self.DATA_DIR)
-        if not self.settings["-athan-sound-"] or self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
+        if not self.settings["-athan-sound-"] or \
+                self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
             self.settings["-athan-sound-"] = "Default.wav"
         if not self.settings["-mute-athan-"]:
             self.settings["-mute-athan-"] = False
@@ -76,7 +78,7 @@ class Athany():
             self.ARABIC_FONT = "Segoe\ UI 12"
             self.MONO_FONT = "Hack 9"
         self.GUI_FONT = "Segoe\ UI 11"
-        self.BUTTON_FONT = "Helvetica 10"
+        self.BUTTON_FONT = "Helvetica 9"
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode="rb") as icon:
             self.APP_ICON = icon.read()
@@ -104,9 +106,14 @@ class Athany():
                                      sg.Text(key="-AUTO-LOCATION-"),
                                      sg.Push(), sg.Button("Cancel", key="-CANCEL-", size=(10, 1), font=self.BUTTON_FONT)]]
 
+        '''
+            set the self.init_layout variable and
+            add upcoming prayers to the corresponding list variable
+        '''
         self.set_main_layout_and_tomorrow_prayers(
             self.choose_location_if_not_saved())
-    # ------------------------------------- Main Application logic ------------------------------------- #
+
+    # ------------------------------------- Main Application logic ------------------------------- #
 
     def download_athan(self, athan_filename: str) -> bool:
         """Function to download athans from app bucket
@@ -198,13 +205,13 @@ class Athany():
                                     timeout=100)
             country_res = requests.get("https://ipinfo.io/country",
                                        timeout=100)
-            IP_city = city_res.text.strip()
-            IP_country = country_res.text.strip()
+            ip_city = city_res.text.strip()
+            ip_country = country_res.text.strip()
 
             if city_res.status_code != 200 or country_res.status_code != 200:
                 raise Exception
 
-            return (IP_city, IP_country)
+            return (ip_city, ip_country)
 
         except:
             return "RequestError"
@@ -244,8 +251,8 @@ class Athany():
         :param api_res: (dict) api response to extract hijri date from
         :return: (str) Arabic string of current Hijri date
         """
-        hirjir_date = api_res["data"][date.day - 1]["date"]["hijri"]
-        text = f"{hirjir_date['weekday']['ar']} {hirjir_date['day']} {hirjir_date['month']['ar']} {hirjir_date['year']}"
+        hijri_date = api_res["data"][date.day - 1]["date"]["hijri"]
+        text = f"{hijri_date['weekday']['ar']} {hijri_date['day']} {hijri_date['month']['ar']} {hijri_date['year']}"
         return display_ar_text(text=text)
 
     def set_main_layout_and_tomorrow_prayers(self, api_res: dict) -> tuple[list, dict]:
@@ -345,7 +352,8 @@ class Athany():
             self.current_fard = ["Isha", current_times["Isha"]]
 
         print("="*50)
-    # ------------------------------------- Main Windows And SystemTray Functions ------------------------------------- #
+
+    # ----------------------------- Main Windows And SystemTray Functions ------------------------ #
 
     def choose_location_if_not_saved(self) -> dict:
         """function to get & set the user location
@@ -699,8 +707,8 @@ class Athany():
 # ------------------------------------- Starts The GUI ------------------------------------- #
 
 if __name__ == "__main__":
-    keep_trying = True
-    while keep_trying:
+    KEEP_TRYING = True
+    while KEEP_TRYING:
         try:
             app = Athany()
             app.display_main_window(app.init_layout)
@@ -711,6 +719,7 @@ if __name__ == "__main__":
                     app.settings.delete_entry("-city-")
                     app.settings.delete_entry("-country-")
 
-            keep_trying = False
+            KEEP_TRYING = False
         except TypeError:
-            keep_trying = keep_trying_popup()
+            del app
+            KEEP_TRYING = keep_trying_popup()
