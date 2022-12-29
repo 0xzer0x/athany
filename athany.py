@@ -147,7 +147,7 @@ class Athany():
 
                 progress_layout = [
                     [sg.Text(
-                        f"Downloading {athan_filename} ({file_size//1024} KB) from archive...")],
+                        f"Downloading {athan_filename} ({file_size//1024} KB)...")],
                     [sg.ProgressBar(max_value=file_size,
                                     size=(20, 10), expand_x=True, orientation="h", key="-PROGRESS-METER-")],
                     [sg.Push(), sg.Button("Cancel")]
@@ -218,7 +218,6 @@ class Athany():
         :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
         """
         try:
-            # https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a
             ipinfo_res = requests.get(
                 "https://ipinfo.io/json", timeout=10)
 
@@ -256,7 +255,7 @@ class Athany():
             try:
                 res = requests.get(
                     self.API_ENDPOINT+f"?city={cit}&country={count}&month={month}&year={year}", timeout=20)
-            except:
+            except (requests.Timeout, requests.ConnectionError):
                 return "RequestError"
 
             if res.status_code != 200:  # if invalid city or country, return None instead of filename
@@ -281,19 +280,19 @@ class Athany():
         return display_ar_text(text=text)
 
     def set_main_layout_and_tomorrow_prayers(self, api_res: dict) -> tuple[list, dict]:
-        """sets the prayer times window layout and sets the inital upcoming prayers on application startup
+        """sets the prayer times window layout and
+        the inital upcoming prayers on application startup
         :param api_res: (dict) - adhan api month json response as a dictionary
         """
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
         current_times = api_res["data"][self.now.day-1]["timings"]
 
-        ISHA_OBJ = current_times["Isha"].split()
-        ISHA_PASSED = False
+        isha_passed = False
         # Check if Isha passed as to get the following day timings
         # Prayer times change after Isha athan to the times of the following day
         # if self.now is after current Isha time
-        if self.now > datetime.datetime.strptime(f"{ISHA_OBJ[0]} {self.now.day} {self.now.month} {self.now.year}", "%H:%M %d %m %Y"):
+        if self.now > datetime.datetime(self.now.year, self.now.month, self.now.day, hour=int(current_times["Isha"][:2]), minute=int(current_times["Isha"][3:5])):
             # replace all prayer times with the next day prayers
             # SPECIAL CASE: if today is the last day in the month, fetch new month calender
             if self.tomorrow.day < self.now.day:
@@ -327,37 +326,56 @@ class Athany():
             else:
                 current_times = api_res["data"][self.now.day]["timings"]
 
-            ISHA_PASSED = True
+            isha_passed = True
 
         self.current_m_data = api_res
-        # loop through all prayer times to convert timing to datetime objects to be able to preform operations on them
-        for k, v in current_times.items():
-            # to adjust the day,month, year of the prayer datetime object
-            date = self.tomorrow if ISHA_PASSED else self.now
-            t = v.split(" ")[0] + f" {date.day} {date.month} {date.year}"
-            current_times[k] = datetime.datetime.strptime(
-                t, "%H:%M %d %m %Y")
+        # loop through all prayer times to convert timing to datetime objects
+        for prayer_name, time_str in current_times.items():
+            # to adjust the day, month, year of the prayer datetime object
+            date = self.tomorrow if isha_passed else self.now
+
+            # time_str is in the format "05:24 (EET)"
+            current_times[prayer_name] = datetime.datetime(
+                date.year,
+                date.month,
+                date.day,
+                hour=int(time_str[:2]),
+                minute=int(time_str[3:5])
+            )
 
         print(" DEBUG ".center(50, "="))
+
         self.init_layout = [
-            [sg.Text(key="-TODAY-", font=self.GUI_FONT+" bold"),
-             sg.Push(),
-             sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 6"),
-             sg.Push(),
-             sg.Text(key="-TODAY_HIJRI-", font=self.ARABIC_FONT)],
-            [sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=self.GUI_FONT),
+            [
+                sg.Text(key="-TODAY-", font=self.GUI_FONT+" bold"),
+                sg.Push(),
+                sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 6"),
+                sg.Push(),
+                sg.Text(key="-TODAY_HIJRI-", font=self.ARABIC_FONT)
+            ],
+            [
+                sg.Text(sg.SYMBOL_LEFT_ARROWHEAD, font=self.GUI_FONT),
                 sg.HorizontalSeparator(),
-                sg.Text(font=self.GUI_FONT, key="-NEXT PRAYER-"),
+                sg.Text(key="-NEXT-PRAYER-"),
                 sg.Text("in", font=self.GUI_FONT),
-                sg.Text(font=self.GUI_FONT, key="-TIME_D-"),
+                sg.Text(font=self.GUI_FONT, key="-TIME-D-"),
                 sg.HorizontalSeparator(),
-                sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=self.GUI_FONT)]
+                sg.Text(sg.SYMBOL_RIGHT_ARROWHEAD, font=self.GUI_FONT)
+            ]
         ]
+
         for prayer, time in current_times.items():  # append upcoming prayers to list
             # setting the main window layout with the inital prayer times
             if prayer in self.FUROOD_NAMES or prayer == "Sunrise":
-                self.init_layout.append([sg.Text(f"{prayer}:", font=self.GUI_FONT, key=f"-{prayer.upper()}-"), sg.Push(),
-                                         sg.Text(f"{time.strftime('%I:%M %p')}", font=self.GUI_FONT, key=f"-{prayer.upper()} TIME-")])
+                self.init_layout.append(
+                    [
+                        sg.Text(f"{prayer}:", key=f"-{prayer.upper()}-",
+                                font=self.GUI_FONT),
+                        sg.Push(),
+                        sg.Text(f"{time.strftime('%I:%M %p')}", key=f"-{prayer.upper()}-TIME-",
+                                font=self.GUI_FONT)
+                    ]
+                )
 
                 print(prayer, time)  # Debugging
                 if self.now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
@@ -366,12 +384,19 @@ class Athany():
                     self.current_fard = [prayer, time]
 
         # the rest of the main window layout
-        self.init_layout += [[sg.HorizontalSeparator(color="dark brown")],
-                             [sg.Button("Settings", key="-SETTINGS-", font=self.BUTTON_FONT),
-                              sg.Button("Stop athan", key="-STOP-ATHAN-",
-                                        font=self.BUTTON_FONT),
-                              sg.Push(),
-                              sg.Text("current time", font=self.MONO_FONT), sg.Text("~", font=self.MONO_FONT), sg.Text(key="-CURRENT-TIME-", font=self.MONO_FONT)]]
+        self.init_layout += [
+            [sg.HorizontalSeparator(color="dark brown")],
+            [
+                sg.Button("Settings", key="-SETTINGS-",
+                          font=self.BUTTON_FONT),
+                sg.Button("Stop athan", key="-STOP-ATHAN-",
+                          font=self.BUTTON_FONT),
+                sg.Push(),
+                sg.Text("current time", font=self.MONO_FONT),
+                sg.Text("~", font=self.MONO_FONT),
+                sg.Text(key="-CURRENT-TIME-", font=self.MONO_FONT)
+            ]
+        ]
 
         if not self.current_fard:
             self.current_fard = ["Isha", current_times["Isha"]]
@@ -525,7 +550,7 @@ class Athany():
                     if f != self.current_fard[0]:
                         window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
                                                         text_color=sg.theme_text_color())
-                        window[f"-{f.upper()} TIME-"].update(font=self.GUI_FONT,
+                        window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
                                                              text_color=sg.theme_text_color())
 
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
@@ -537,7 +562,7 @@ class Athany():
                                                  self.now.year)
                     )
                     for prayer in self.UPCOMING_PRAYERS:
-                        window[f"-{prayer[0].upper()} TIME-"].update(
+                        window[f"-{prayer[0].upper()}-TIME-"].update(
                             value=prayer[1].strftime("%I:%M %p"))
 
             # get remaining time till next prayer
@@ -546,13 +571,13 @@ class Athany():
             # Highlight current fard in main window
             window[f"-{self.current_fard[0].upper()}-"].update(
                 font=self.GUI_FONT+" italic", text_color='#cd8032')
-            window[f"-{self.current_fard[0].upper()} TIME-"].update(
+            window[f"-{self.current_fard[0].upper()}-TIME-"].update(
                 font=self.GUI_FONT+" italic", text_color='#cd8032')
 
             # update the main window with the next prayer and remaining time
-            window["-NEXT PRAYER-"].update(
+            window["-NEXT-PRAYER-"].update(
                 value=f"{self.UPCOMING_PRAYERS[0][0]}", font=self.GUI_FONT+" bold")
-            window["-TIME_D-"].update(value=str(time_d))
+            window["-TIME-D-"].update(value=str(time_d))
 
             # update the current dates
             window["-CURRENT-TIME-"].update(
