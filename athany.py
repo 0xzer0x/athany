@@ -29,10 +29,10 @@ def display_ar_text(text: str) -> str:
         return text
 
 
-def keep_trying_popup(text="An error occurred, Do you want to restart the application?"):
+def error_popup(text="An error occurred, Do you want to restart the application?"):
     """function to display an error window & prompt the user to try again"""
     ans, _ = sg.Window("Try Again?", [[sg.T(text)],
-                                      [sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
+                                      [sg.Push(), sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
     if ans == "Yes":
         return True
     else:
@@ -92,19 +92,36 @@ class Athany():
             self.TOGGLE_ON_B64 = ton.read()
 
         sg.set_global_icon(self.APP_ICON)
+        self.location_api = None
+        self.current_fard = None
+        self.end_of_month_hijri = None
+        self.download_thread_active = False
+        self.location_win_layout = [
+            [
+                sg.Text("Set your location", size=(50, 1), key="-LOC-TXT-")
+            ],
+            [
+                sg.Text("City"),
+                sg.Input(size=(15, 1), key="-CITY-", focus=True),
+                sg.Text("Country"),
+                sg.Input(size=(15, 1), key="-COUNTRY-"),
+                sg.Push(),
+                sg.Checkbox("Save settings", key="-SAVE-LOC-CHECK-")
+            ],
+            [
+                sg.Button("Ok", size=(10, 1), key="-OK-",
+                          font=self.BUTTON_FONT, bind_return_key=True),
+                sg.Button("Use current location",
+                          key="-USE-CURRENT-LOCATION-", font=self.BUTTON_FONT),
+                sg.Text(key="-AUTO-LOCATION-"),
+                sg.Push(),
+                sg.Button("Cancel", size=(10, 1),
+                          key="-CANCEL-", font=self.BUTTON_FONT)
+            ]
+        ]
+
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
-        self.download_thread_active = False
-        self.current_fard = None
-        self.location_api = None
-        self.location_win_layout = [[sg.Text("Set your location", size=(50, 1), key="-LOC TXT-")],
-                                    [sg.Text("City"), sg.Input(size=(15, 1), key="-CITY-", focus=True),
-                                     sg.Text("Country"), sg.Input(size=(15, 1), key="-COUNTRY-"), sg.Push(), sg.Checkbox("Save settings", key="-SAVE_LOC_CHECK-")],
-                                    [sg.Button("Ok", key="-OK-", size=(10, 1), font=self.BUTTON_FONT, bind_return_key=True),
-                                     sg.Button(
-                                         "Use current location", key="-USE-CURRENT-LOCATION-", font=self.BUTTON_FONT),
-                                     sg.Text(key="-AUTO-LOCATION-"),
-                                     sg.Push(), sg.Button("Cancel", key="-CANCEL-", size=(10, 1), font=self.BUTTON_FONT)]]
 
         '''
             set the self.init_layout variable and
@@ -164,6 +181,16 @@ class Athany():
             os.remove(saved_file)
             return False
 
+    def play_current_athan(self) -> simpleaudio.PlayObject:
+        """ fetches current settings for athan and plays the corresponding athan
+        :return: (simpleaudio.PlayObject) play object to control playback of athan
+        """
+        current_athan_path = os.path.join(
+            self.ATHANS_DIR, self.settings["-athan-sound-"])
+        wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
+        play_obj = wave_obj.play()
+        return play_obj
+
     def download_12_months(self):
         """function that downloads api data for the next 12 months"""
         if not self.download_thread_active:
@@ -186,35 +213,33 @@ class Athany():
             self.settings.save()
             self.download_thread_active = False
 
-    def play_current_athan(self) -> simpleaudio.PlayObject:
-        """ fetches current settings for athan and plays the corresponding athan
-        :return: (simpleaudio.PlayObject) play object to control playback of athan
-        """
-        current_athan_path = os.path.join(
-            self.ATHANS_DIR, self.settings["-athan-sound-"])
-        wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
-        play_obj = wave_obj.play()
-        return play_obj
-
     def get_current_location(self) -> tuple[str, str]:
         """ function that gets the current city and country of the user IP\n
         :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
         """
         try:
-            city_res = requests.get("https://ipinfo.io/city",
-                                    timeout=100)
-            country_res = requests.get("https://ipinfo.io/country",
-                                       timeout=100)
-            ip_city = city_res.text.strip()
-            ip_country = country_res.text.strip()
+            # https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a
+            ipinfo_res = requests.get(
+                "https://ipinfo.io/json", timeout=10)
 
-            if city_res.status_code != 200 or country_res.status_code != 200:
-                raise Exception
+            if ipinfo_res.status_code == 200:
+                ipinfo_json = ipinfo_res.json()
+                ret_val = (ipinfo_json["city"], ipinfo_json["country"])
+            else:
+                ipgeoloc_res = requests.get(
+                    "https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a", timeout=10)
 
-            return (ip_city, ip_country)
+                if ipgeoloc_res.status_code == 200:
+                    ipgeoloc_json = ipgeoloc_res.json()
+                    ret_val = (ipgeoloc_json["city"],
+                               ipgeoloc_json["country_code2"])
+                else:
+                    raise requests.exceptions.ConnectionError
 
-        except:
-            return "RequestError"
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            ret_val = "RequestError"
+
+        return ret_val
 
     def fetch_calender_data(self, cit: str, count: str, month: str, year: str) -> dict:
         """check if calender data for the city+country+month+year exists and fetch it if not
@@ -282,7 +307,7 @@ class Athany():
                     self.tomorrow.year)
 
                 while api_res == "RequestError":
-                    keep_trying = keep_trying_popup(
+                    keep_trying = error_popup(
                         "Couldn't fetch new month data, try again?")
                     if not keep_trying:
                         sys.exit()
@@ -387,7 +412,7 @@ class Athany():
                         if len(country) == 2:
                             country = country.upper()
 
-                        choose_location["-LOC TXT-"].update(
+                        choose_location["-LOC-TXT-"].update(
                             value=f"Fetching prayer times for {city}, {country}....")
                         choose_location.refresh()
 
@@ -397,7 +422,7 @@ class Athany():
                                                           self.now.year)
 
                         if m_data is None:  # if invalid city/country dont continue
-                            choose_location["-LOC TXT-"].update(
+                            choose_location["-LOC-TXT-"].update(
                                 value="Invalid city or country, enter a valid location")
                             choose_location["-CITY-"].update(
                                 background_color="dark red")
@@ -409,7 +434,7 @@ class Athany():
                         if not isinstance(self.location_api, tuple):
                             self.location_api = self.get_current_location()
                         if self.location_api == "RequestError":
-                            choose_location["-LOC TXT-"].update(
+                            choose_location["-LOC-TXT-"].update(
                                 value="An error occurred, try entering location manually")
                             choose_location.refresh()
 
@@ -417,7 +442,7 @@ class Athany():
                             city = self.location_api[0]
                             country = self.location_api[1]
 
-                            choose_location["-LOC TXT-"].update(
+                            choose_location["-LOC-TXT-"].update(
                                 value=f"Fetching prayer times for {city}, {country}...")
                             choose_location.refresh()
 
@@ -430,13 +455,13 @@ class Athany():
                         continue
 
                     if m_data == "RequestError":
-                        choose_location["-LOC TXT-"].update(
+                        choose_location["-LOC-TXT-"].update(
                             value="Internet connection required")
                     else:
                         self.settings["-city-"] = city
                         self.settings["-country-"] = country
 
-                        self.save_loc_check = values["-SAVE_LOC_CHECK-"]
+                        self.save_loc_check = values["-SAVE-LOC-CHECK-"]
 
                         # close location choosing window
                         choose_location.close()
@@ -527,7 +552,7 @@ class Athany():
             # update the main window with the next prayer and remaining time
             window["-NEXT PRAYER-"].update(
                 value=f"{self.UPCOMING_PRAYERS[0][0]}", font=self.GUI_FONT+" bold")
-            window["-TIME_D-"].update(value=f"{time_d}")
+            window["-TIME_D-"].update(value=str(time_d))
 
             # update the current dates
             window["-CURRENT-TIME-"].update(
@@ -537,7 +562,6 @@ class Athany():
 
             # update hijri date from api response
             if self.now.month == self.UPCOMING_PRAYERS[0][1].month:
-                self.end_of_month_hijri = None
                 window["-TODAY_HIJRI-"].update(
                     value=self.get_hijri_date_from_json(self.now, api_res=self.current_m_data))
             else:  # self.end_of_month_hijri will be set by the upcoming prayers function after Isha
@@ -722,4 +746,4 @@ if __name__ == "__main__":
             KEEP_TRYING = False
         except TypeError:
             del app
-            KEEP_TRYING = keep_trying_popup()
+            KEEP_TRYING = error_popup()
