@@ -547,11 +547,10 @@ class Athany():
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
 
                 for f in self.FUROOD_NAMES+["Sunrise"]:
-                    if f != self.current_fard[0]:
-                        window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
-                                                        text_color=sg.theme_text_color())
-                        window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
-                                                             text_color=sg.theme_text_color())
+                    window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
+                                                    text_color=sg.theme_text_color())
+                    window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
+                                                         text_color=sg.theme_text_color())
 
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
@@ -569,10 +568,16 @@ class Athany():
             time_d = self.UPCOMING_PRAYERS[0][1] - self.now
 
             # Highlight current fard in main window
-            window[f"-{self.current_fard[0].upper()}-"].update(
-                font=self.GUI_FONT+" italic", text_color='#cd8032')
-            window[f"-{self.current_fard[0].upper()}-TIME-"].update(
-                font=self.GUI_FONT+" italic", text_color='#cd8032')
+            if self.current_fard[0] == "Sunrise":
+                window["-FAJR-"].update(
+                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+                window["-FAJR-TIME-"].update(
+                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+            else:
+                window[f"-{self.current_fard[0].upper()}-"].update(
+                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+                window[f"-{self.current_fard[0].upper()}-TIME-"].update(
+                    font=self.GUI_FONT+" italic", text_color='#cd8032')
 
             # update the main window with the next prayer and remaining time
             window["-NEXT-PRAYER-"].update(
