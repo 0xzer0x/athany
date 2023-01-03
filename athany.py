@@ -165,7 +165,7 @@ class Athany():
                     prog_win.make_modal()
                     if prog_e in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Cancel"):
                         file_data.close()
-                        raise Exception
+                        raise requests.exceptions.ConnectionError
 
                     prog_win["-PROGRESS-METER-"].update(current_count=dl)
 
@@ -173,7 +173,7 @@ class Athany():
                 del prog_win
 
             return True
-        except:
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.InvalidURL):
             if prog_win:
                 prog_win.close()
                 del prog_win
