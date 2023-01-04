@@ -710,6 +710,9 @@ class Athany:
                         self.restart_app = yes_or_no_popup(
                             f"Theme was changed to {self.chosen_theme}, Do you want to restart application?")
                         if self.restart_app:
+                            if athan_play_obj:
+                                athan_play_obj.stop()
+
                             win2_active = False
                             self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
                             settings_window.close()
