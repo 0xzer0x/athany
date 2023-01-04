@@ -29,17 +29,17 @@ def display_ar_text(text: str) -> str:
         return text
 
 
-def error_popup(text="An error occurred, Do you want to restart the application?"):
+def yes_or_no_popup(text="An error occurred, Do you want to restart the application?"):
     """function to display an error window & prompt the user to try again"""
-    ans, _ = sg.Window("Try Again?", [[sg.T(text)],
-                                      [sg.Push(), sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
+    ans, _ = sg.Window("Confirm", [[sg.T(text)],
+                                   [sg.Push(), sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
     if ans == "Yes":
         return True
     else:
         return False
 
 
-class Athany():
+class Athany:
     """Python application to fetch prayer times, display them in a GUI and play adhan"""
     # ------------------------------------- Application Settings --------------------------------- #
 
@@ -53,19 +53,22 @@ class Athany():
         if not os.path.exists(self.ATHANS_DIR):
             os.mkdir(self.ATHANS_DIR)
 
-        sg.theme("DarkAmber")
         self.settings = sg.UserSettings(
             filename="athany-config.json", path=self.DATA_DIR)
-        if not self.settings["-athan-sound-"] or \
-                self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
-            self.settings["-athan-sound-"] = "Default.wav"
+        if not self.settings["-theme-"]:
+            self.settings["-theme-"] = "DarkAmber"
         if not self.settings["-mute-athan-"]:
             self.settings["-mute-athan-"] = False
         if not self.settings["-last-time-down-12-mons-"]:
             self.settings["-last-time-down-12-mons-"] = dict()
+        if not self.settings["-athan-sound-"] or \
+                self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
+            self.settings["-athan-sound-"] = "Default.wav"
 
         self.UPCOMING_PRAYERS = []
         self.save_loc_check = False
+        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13", "DarkBlue17", "DarkBrown", "DarkBrown2", "DarkBrown7", "DarkGreen7",
+                                 "DarkGrey2", "DarkGrey5", "DarkGrey8", "DarkGrey10", "DarkGrey11", "DarkGrey13", "DarkPurple7", "DarkTeal10", "DarkTeal11"]
         self.API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
         self.FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
         with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
@@ -91,8 +94,12 @@ class Athany():
         with open(os.path.join(self.DATA_DIR, "toggle_on.dat"), mode="rb") as ton:
             self.TOGGLE_ON_B64 = ton.read()
 
+        sg.theme(self.settings["-theme-"])
         sg.set_global_icon(self.APP_ICON)
+
+        self.restart_app = False
         self.location_api = None
+        self.chosen_theme = None
         self.current_fard = None
         self.end_of_month_hijri = None
         self.download_thread_active = False
@@ -123,12 +130,8 @@ class Athany():
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
 
-        '''
-            set the self.init_layout variable and
-            add upcoming prayers to the corresponding list variable
-        '''
-        self.set_main_layout_and_tomorrow_prayers(
-            self.choose_location_if_not_saved())
+        # self.current_m_data will either be a dict (api json response) or None
+        self.current_m_data = self.choose_location_if_not_saved()
 
     # ------------------------------------- Main Application logic ------------------------------- #
 
@@ -204,7 +207,7 @@ class Athany():
                     download_year = self.now.year+1
                 downloaded = False
                 while not downloaded:
-                    downloaded = not isinstance(self.fetch_calender_data(self.settings["-city-"],
+                    downloaded = not isinstance(self.fetch_calendar_data(self.settings["-city-"],
                                                                          self.settings["-country-"],
                                                                          download_mon,
                                                                          download_year), str)
@@ -240,8 +243,8 @@ class Athany():
 
         return ret_val
 
-    def fetch_calender_data(self, cit: str, count: str, month: str, year: str) -> dict:
-        """check if calender data for the city+country+month+year exists and fetch it if not
+    def fetch_calendar_data(self, cit: str, count: str, month: str, year: str) -> dict:
+        """check if calendar data for the city+country+month+year exists and fetch it if not
         :param cit: (str) city to get data for
         :param count: (str) country to get data for
         :param month: (str) month to get times for
@@ -294,24 +297,24 @@ class Athany():
         # if self.now is after current Isha time
         if self.now > datetime.datetime(self.now.year, self.now.month, self.now.day, hour=int(current_times["Isha"][:2]), minute=int(current_times["Isha"][3:5])):
             # replace all prayer times with the next day prayers
-            # SPECIAL CASE: if today is the last day in the month, fetch new month calender
+            # SPECIAL CASE: if today is the last day in the month, fetch new month calendar
             if self.tomorrow.day < self.now.day:
                 self.end_of_month_hijri = self.get_hijri_date_from_json(
                     self.now, api_res=api_res)
 
-                api_res = self.fetch_calender_data(
+                api_res = self.fetch_calendar_data(
                     self.settings["-city-"],
                     self.settings["-country-"],
                     self.tomorrow.month,
                     self.tomorrow.year)
 
                 while api_res == "RequestError":
-                    keep_trying = error_popup(
+                    keep_trying = yes_or_no_popup(
                         "Couldn't fetch new month data, try again?")
                     if not keep_trying:
                         sys.exit()
                     else:
-                        api_res = self.fetch_calender_data(
+                        api_res = self.fetch_calendar_data(
                             self.settings["-city-"],
                             self.settings["-country-"],
                             self.tomorrow.month,
@@ -372,7 +375,7 @@ class Athany():
                         sg.Text(f"{prayer}:", key=f"-{prayer.upper()}-",
                                 font=self.GUI_FONT),
                         sg.Push(),
-                        sg.Text(f"{time.strftime('%I:%M %p')}", key=f"-{prayer.upper()}-TIME-",
+                        sg.Text(time.strftime('%I:%M %p'), key=f"-{prayer.upper()}-TIME-",
                                 font=self.GUI_FONT)
                     ]
                 )
@@ -411,24 +414,23 @@ class Athany():
         """
         if self.settings["-city-"] is None and self.settings["-country-"] is None:
             # If there are no saved settings, display the choose location window to set these values
-            choose_location = sg.Window("Athany - set location",
-                                        self.location_win_layout,
-                                        font=self.GUI_FONT)
+            self.choose_location = sg.Window("Athany - set location",
+                                             self.location_win_layout,
+                                             font=self.GUI_FONT)
 
-            choose_location.perform_long_operation(
+            self.choose_location.perform_long_operation(
                 self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
             while True:
                 m_data = False
-                event, values = choose_location.read()
+                event, values = self.choose_location.read()
 
                 if event in (sg.WIN_CLOSED, "-CANCEL-"):
-                    choose_location.close()
-                    del choose_location
-                    sys.exit()
+                    self.close_app_windows()
+                    break
 
                 elif event == "-AUTOMATIC-LOCATION-THREAD-":
                     self.location_api = values["-AUTOMATIC-LOCATION-THREAD-"]
-                    choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
+                    self.choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
                         self.location_api, str) else "(Internet connection required)")
                 else:
                     if event == "-OK-" and values["-CITY-"].strip() and values["-COUNTRY-"].strip():
@@ -437,21 +439,21 @@ class Athany():
                         if len(country) == 2:
                             country = country.upper()
 
-                        choose_location["-LOC-TXT-"].update(
+                        self.choose_location["-LOC-TXT-"].update(
                             value=f"Fetching prayer times for {city}, {country}....")
-                        choose_location.refresh()
+                        self.choose_location.refresh()
 
-                        m_data = self.fetch_calender_data(city,
+                        m_data = self.fetch_calendar_data(city,
                                                           country,
                                                           self.now.month,
                                                           self.now.year)
 
                         if m_data is None:  # if invalid city/country dont continue
-                            choose_location["-LOC-TXT-"].update(
+                            self.choose_location["-LOC-TXT-"].update(
                                 value="Invalid city or country, enter a valid location")
-                            choose_location["-CITY-"].update(
+                            self.choose_location["-CITY-"].update(
                                 background_color="dark red")
-                            choose_location["-COUNTRY-"].update(
+                            self.choose_location["-COUNTRY-"].update(
                                 background_color="dark red")
                             continue
 
@@ -459,19 +461,19 @@ class Athany():
                         if not isinstance(self.location_api, tuple):
                             self.location_api = self.get_current_location()
                         if self.location_api == "RequestError":
-                            choose_location["-LOC-TXT-"].update(
+                            self.choose_location["-LOC-TXT-"].update(
                                 value="An error occurred, try entering location manually")
-                            choose_location.refresh()
+                            self.choose_location.refresh()
 
                         else:
                             city = self.location_api[0]
                             country = self.location_api[1]
 
-                            choose_location["-LOC-TXT-"].update(
+                            self.choose_location["-LOC-TXT-"].update(
                                 value=f"Fetching prayer times for {city}, {country}...")
-                            choose_location.refresh()
+                            self.choose_location.refresh()
 
-                            m_data = self.fetch_calender_data(city,
+                            m_data = self.fetch_calendar_data(city,
                                                               country,
                                                               self.now.month,
                                                               self.now.year)
@@ -480,7 +482,7 @@ class Athany():
                         continue
 
                     if m_data == "RequestError":
-                        choose_location["-LOC-TXT-"].update(
+                        self.choose_location["-LOC-TXT-"].update(
                             value="Internet connection required")
                     else:
                         self.settings["-city-"] = city
@@ -489,14 +491,13 @@ class Athany():
                         self.save_loc_check = values["-SAVE-LOC-CHECK-"]
 
                         # close location choosing window
-                        choose_location.close()
-                        del choose_location
+                        self.close_app_windows()
 
                         return m_data
 
         else:
             self.save_loc_check = True
-            m_data = self.fetch_calender_data(
+            m_data = self.fetch_calendar_data(
                 self.settings["-city-"],
                 self.settings["-country-"],
                 self.now.month,
@@ -520,12 +521,12 @@ class Athany():
         """Displays the main application window, keeps running until window is closed
         :param main_win_layout: (list) main application window layout
         """
-        window = sg.Window("Athany: a python athan app",
-                           main_win_layout,
-                           enable_close_attempted_event=True,
-                           finalize=True)
+        self.window = sg.Window("Athany: a python athan app",
+                                main_win_layout,
+                                enable_close_attempted_event=True,
+                                finalize=True)
 
-        application_tray = self.start_system_tray(win=window)
+        self.application_tray = self.start_system_tray(win=self.window)
         win2_active = False
         athan_play_obj = None
         while True:
@@ -536,7 +537,7 @@ class Athany():
                 self.current_fard = self.UPCOMING_PRAYERS.pop(0)
 
                 if self.current_fard[0] != "Sunrise":
-                    application_tray.show_message(
+                    self.application_tray.show_message(
                         title="Athany", message=f"It's time for {self.current_fard[0]} prayer 🕌")
                     # play athan sound from user athan sound settings (if athan sound not muted)
                     try:
@@ -547,21 +548,21 @@ class Athany():
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
 
                 for f in self.FUROOD_NAMES+["Sunrise"]:
-                    window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
-                                                    text_color=sg.theme_text_color())
-                    window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
+                    self.window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
                                                          text_color=sg.theme_text_color())
+                    self.window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
+                                                              text_color=sg.theme_text_color())
 
                 # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
                     self.set_main_layout_and_tomorrow_prayers(
-                        self.fetch_calender_data(self.settings["-city-"],
+                        self.fetch_calendar_data(self.settings["-city-"],
                                                  self.settings["-country-"],
                                                  self.now.month,
                                                  self.now.year)
                     )
                     for prayer in self.UPCOMING_PRAYERS:
-                        window[f"-{prayer[0].upper()}-TIME-"].update(
+                        self.window[f"-{prayer[0].upper()}-TIME-"].update(
                             value=prayer[1].strftime("%I:%M %p"))
 
             # get remaining time till next prayer
@@ -569,42 +570,43 @@ class Athany():
 
             # Highlight current fard in main window
             if self.current_fard[0] == "Sunrise":
-                window["-FAJR-"].update(
+                self.window["-FAJR-"].update(
                     font=self.GUI_FONT+" italic", text_color='#cd8032')
-                window["-FAJR-TIME-"].update(
+                self.window["-FAJR-TIME-"].update(
                     font=self.GUI_FONT+" italic", text_color='#cd8032')
             else:
-                window[f"-{self.current_fard[0].upper()}-"].update(
+                self.window[f"-{self.current_fard[0].upper()}-"].update(
                     font=self.GUI_FONT+" italic", text_color='#cd8032')
-                window[f"-{self.current_fard[0].upper()}-TIME-"].update(
+                self.window[f"-{self.current_fard[0].upper()}-TIME-"].update(
                     font=self.GUI_FONT+" italic", text_color='#cd8032')
 
             # update the main window with the next prayer and remaining time
-            window["-NEXT-PRAYER-"].update(
+            self.window["-NEXT-PRAYER-"].update(
                 value=f"{self.UPCOMING_PRAYERS[0][0]}", font=self.GUI_FONT+" bold")
-            window["-TIME-D-"].update(value=str(time_d))
+            self.window["-TIME-D-"].update(value=str(time_d))
 
             # update the current dates
-            window["-CURRENT-TIME-"].update(
+            self.window["-CURRENT-TIME-"].update(
                 value=self.now.strftime("%I:%M %p"))
-            window["-TODAY-"].update(
+            self.window["-TODAY-"].update(
                 value=self.now.date().strftime("%a %d %b %y"))
 
             # update hijri date from api response
             if self.now.month == self.UPCOMING_PRAYERS[0][1].month:
-                window["-TODAY_HIJRI-"].update(
+                self.window["-TODAY_HIJRI-"].update(
                     value=self.get_hijri_date_from_json(self.now, api_res=self.current_m_data))
             else:  # self.end_of_month_hijri will be set by the upcoming prayers function after Isha
-                window["-TODAY_HIJRI-"].update(value=self.end_of_month_hijri)
+                self.window["-TODAY_HIJRI-"].update(
+                    value=self.end_of_month_hijri)
 
             # update system tray tooltip also
-            application_tray.set_tooltip(
+            self.application_tray.set_tooltip(
                 f"Next prayer: {self.UPCOMING_PRAYERS[0][0]} in {time_d}")
 
             # main event reading
-            event1, values1 = window.read(timeout=100)
+            event1, values1 = self.window.read(timeout=100)
 
-            if event1 == application_tray.key:
+            if event1 == self.application_tray.key:
                 event1 = values1[event1]
                 # Debugging
                 print("[DEBUG] SystemTray event:", event1)
@@ -614,14 +616,14 @@ class Athany():
                 break
 
             if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
-                window.hide()
-                application_tray.show_icon()
-                application_tray.show_message(title="Athany minimized to system tray",
-                                              message="To completely close the app, choose the 'Exit' button")
+                self.window.hide()
+                self.application_tray.show_icon()
+                self.application_tray.show_message(title="Athany minimized to system tray",
+                                                   message="To completely close the app, choose the 'Exit' button")
 
             elif event1 in ("Show Window", sg.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
-                window.un_hide()
-                window.bring_to_front()
+                self.window.un_hide()
+                self.window.bring_to_front()
 
             elif event1 in ("-STOP-ATHAN-", "Stop athan") and athan_play_obj:
                 if athan_play_obj.is_playing():
@@ -652,8 +654,14 @@ class Athany():
                                   border_width=0, pad=(5, 0), metadata=self.save_loc_check)
                     ],
                     [
+                        sg.Text("Current Theme:", pad=(5, 10)),
+                        sg.Push(),
+                        sg.Combo(enable_events=True, values=self.available_themes, key="-DROPDOWN-THEMES-",
+                                 readonly=True, default_value=self.settings["-theme-"], font=self.BUTTON_FONT, pad=(5, 10))
+                    ],
+                    [
                         sg.Text("Current Athan:",
-                                key="-DISPLAYED_MSG-", pad=(5, 10)),
+                                key="-DISPLAYED-MSG-", pad=(5, 10)),
                         sg.Push(),
                         sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
                                  readonly=True, default_value=current_athan, font=self.BUTTON_FONT, pad=(5, 10))
@@ -678,11 +686,36 @@ class Athany():
             # If 2nd window (settings window) is open, read values from it
             if win2_active:
                 event2, values2 = settings_window.read(timeout=100)
+
                 if event2 in (sg.WIN_CLOSED, "-DONE-"):
                     win2_active = False
                     self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
                     settings_window.close()
-                elif event2 == "-DROPDOWN-ATHANS-" and values2["-DROPDOWN-ATHANS-"] in self.AVAILABLE_ADHANS:
+
+                elif event2 == "-TOGGLE-MUTE-":
+                    settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
+                    settings_window["-TOGGLE-MUTE-"].update(
+                        image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else self.TOGGLE_OFF_B64)
+
+                    self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
+
+                elif event2 == "-TOGGLE-GRAPHIC-":
+                    settings_window["-TOGGLE-GRAPHIC-"].metadata = not settings_window["-TOGGLE-GRAPHIC-"].metadata
+                    settings_window["-TOGGLE-GRAPHIC-"].update(
+                        image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-GRAPHIC-"].metadata else self.TOGGLE_OFF_B64)
+
+                elif event2 == "-DROPDOWN-THEMES-":
+                    self.chosen_theme = values2["-DROPDOWN-THEMES-"]
+                    if self.chosen_theme != self.settings["-theme-"]:
+                        self.restart_app = yes_or_no_popup(
+                            f"Theme was changed to {self.chosen_theme}, Do you want to restart application?")
+                        if self.restart_app:
+                            win2_active = False
+                            self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
+                            settings_window.close()
+                            self.window.write_event_value("-EXIT-", None)
+
+                elif event2 == "-DROPDOWN-ATHANS-":
                     # get a list of all athans currently in folder as user might have downloaded before
                     DOWNLOADED_ATHANS = os.listdir(self.ATHANS_DIR)
                     # convert option into filename
@@ -696,7 +729,7 @@ class Athany():
 
                     else:  # athan is not on pc, will be downloaded from the internet
                         settings_window["-DONE-"].update(disabled=True)
-                        settings_window["-DISPLAYED_MSG-"].update(
+                        settings_window["-DISPLAYED-MSG-"].update(
                             value="Establishing connection...")
                         settings_window.refresh()
 
@@ -707,18 +740,18 @@ class Athany():
                         downloaded = self.download_athan(chosen_athan)
                         if downloaded:  # if all went well, set as new athan and play audio
                             self.settings["-athan-sound-"] = chosen_athan
-                            settings_window["-DISPLAYED_MSG-"].update(
+                            settings_window["-DISPLAYED-MSG-"].update(
                                 value="Current Athan:")
                             settings_window.refresh()
 
                             athan_play_obj = self.play_current_athan()
 
                         else:  # something messed up during download or no internet
-                            settings_window["-DISPLAYED_MSG-"].update(
+                            settings_window["-DISPLAYED-MSG-"].update(
                                 value="Current Athan:")
                             settings_window["-DROPDOWN-ATHANS-"].update(
                                 value=self.settings["-athan-sound-"].split(".")[0].replace("_", " "))
-                            application_tray.show_message(
+                            self.application_tray.show_message(
                                 title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
 
                         settings_window["-DONE-"].update(disabled=False)
@@ -726,7 +759,9 @@ class Athany():
                     print("[DEBUG] Current athan:",
                           self.settings["-athan-sound-"])
 
-                # this event will fire only if the button is enabled, the button won't be enabled if there's a thread already downloading this data or the function has already been called this month
+                # this event will fire only if the button is enabled
+                # the button won't be enabled if there's a thread already downloading this data
+                # or the function has already been called this month
                 elif event2 == "-GET-NEXT-12-MON-":
                     settings_window.perform_long_operation(
                         self.download_12_months, "-DOWNLOADED-12-MONS-")
@@ -739,32 +774,44 @@ class Athany():
                     settings_window["-DOWN-12-MON-PROG-"].update(
                         value="Download completed successfully")
 
-                elif event2 == "-TOGGLE-GRAPHIC-":
-                    settings_window["-TOGGLE-GRAPHIC-"].metadata = not settings_window["-TOGGLE-GRAPHIC-"].metadata
-                    settings_window["-TOGGLE-GRAPHIC-"].update(
-                        image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-GRAPHIC-"].metadata else self.TOGGLE_OFF_B64)
-
-                elif event2 == "-TOGGLE-MUTE-":
-                    settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
-                    settings_window["-TOGGLE-MUTE-"].update(
-                        image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else self.TOGGLE_OFF_B64)
-
-                    self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
-
         # close application on exit
-        application_tray.close()
-        window.close()
-        del application_tray
-        del window
+        self.close_app_windows()
 
+    def close_app_windows(self):
+        """function to properly close all app windows before shutting down"""
+        try:
+
+            if self.choose_location:
+                self.choose_location.close()
+                del self.choose_location
+
+        except AttributeError:
+            pass
+
+        try:
+
+            if self.application_tray:
+                self.application_tray.close()
+                del self.application_tray
+
+            if self.window:
+                self.window.close()
+                del self.window
+
+        except AttributeError:
+            pass
 
 # ------------------------------------- Starts The GUI ------------------------------------- #
 
+
 if __name__ == "__main__":
-    KEEP_TRYING = True
-    while KEEP_TRYING:
-        try:
-            app = Athany()
+    RESTART_APP = True
+    while RESTART_APP:
+
+        app = Athany()
+        if app.current_m_data:
+            app.set_main_layout_and_tomorrow_prayers(app.current_m_data)
+            # app.init_layout will be set by the previous line
             app.display_main_window(app.init_layout)
 
             # If user doesn't want to save settings, delete saved entries before closing
@@ -773,7 +820,7 @@ if __name__ == "__main__":
                     app.settings.delete_entry("-city-")
                     app.settings.delete_entry("-country-")
 
-            KEEP_TRYING = False
-        except TypeError:
-            del app
-            KEEP_TRYING = error_popup()
+            if app.chosen_theme:  # if user changed theme in settings, save his choice
+                app.settings["-theme-"] = app.chosen_theme
+
+        RESTART_APP = app.restart_app
