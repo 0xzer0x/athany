@@ -14,6 +14,10 @@ if sys.platform != "win32":
     except ImportError:
         MISSING_ARABIC_MODULES = True
         print("[DEBUG] Couldn't load Arabic text modules, Install arabic text modules to display text correctly")
+else:  # library for system notifications on Windows
+    import ctypes
+    myappid = "athany notifications"
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 
 def display_ar_text(text: str) -> str:

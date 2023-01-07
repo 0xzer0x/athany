@@ -1,3 +1,5 @@
+<a name="readme-top"></a>
+
 ![Athany](images/banner.jpg)
 
 <br>
@@ -45,3 +47,9 @@
 6. run `pip install -r requirements.txt`
 
 7. run `python athany.py`
+
+## License
+
+Distributed under the GNU GPL v3. See `LICENSE.md` for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
