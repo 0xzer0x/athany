@@ -286,7 +286,7 @@ class Athany:
         text = f"{hijri_date['weekday']['ar']} {hijri_date['day']} {hijri_date['month']['ar']} {hijri_date['year']}"
         return display_ar_text(text=text)
 
-    def set_main_layout_and_tomorrow_prayers(self, api_res: dict) -> tuple[list, dict]:
+    def set_main_layout_and_tomorrow_prayers(self, api_res: dict):
         """sets the prayer times window layout and
         the inital upcoming prayers on application startup
         :param api_res: (dict) - adhan api month json response as a dictionary
