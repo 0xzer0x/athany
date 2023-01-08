@@ -81,6 +81,17 @@ class Athany:
                                  "DarkGrey2", "DarkGrey5", "DarkGrey8", "DarkGrey10", "DarkGrey11", "DarkGrey13", "DarkPurple7", "DarkTeal10", "DarkTeal11"]
         self.API_ENDPOINT = " http://api.aladhan.com/v1/timingsByCity"
         self.FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
+        self.calculation_methods = {
+            1: CalculationMethod.KARACHI,
+            2: CalculationMethod.NORTH_AMERICA,
+            3: CalculationMethod.MUSLIM_WORLD_LEAGUE,
+            4: CalculationMethod.UMM_AL_QURA,
+            5: CalculationMethod.EGYPTIAN,
+            9: CalculationMethod.KUWAIT,
+            10: CalculationMethod.QATAR,
+            11: CalculationMethod.SINGAPORE,
+            12: CalculationMethod.UOIF
+        }
         with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
             self.AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
@@ -231,11 +242,11 @@ class Athany:
 
         return ret_val
 
-    def get_prayers_dict(self, coordinates, date=None, method=CalculationMethod.EGYPTIAN):
+    def get_prayers_dict(self, coordinates, date):
         """function to get given date prayer times dictionary"""
         if not date:
             date = self.now
-
+        method = self.calculation_methods.get(self.settings["-method-id-"], 4)
         pt_object = PrayerTimes(coordinates, date, method,
                                 time_zone=ZoneInfo(self.settings["-location-"]["-timezone-"]))
 
@@ -445,6 +456,7 @@ class Athany:
                         )
                         self.settings["-location-"]["-timezone-"] = location_data["timezone"]
                         self.settings.save()
+                        self.settings["-method-id-"] = location_data["method"]["id"]
 
                         self.save_loc_check = values["-SAVE-LOC-CHECK-"]
 
