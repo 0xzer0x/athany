@@ -53,7 +53,7 @@
 
 ## About The Project
 
-[![Athany Screen Shot][product-screenshot]](https://github.com/0xzer0x/athany-app/releases/latest)
+[![Athany Screen Shot][banner]](https://github.com/0xzer0x/athany-app/releases/latest)
 
 ### قال تعالى: {وَمَا خَلَقْتُ ٱلْجِنَّ وَٱلْإِنسَ إِلَّا لِيَعْبُدُونِ (٥٦) مَآ أُرِيدُ مِنْهُم مِّن رِّزْقٍۢ وَمَآ أُرِيدُ أَن يُطْعِمُونِ (٥٧) إِنَّ ٱللَّهَ هُوَ ٱلرَّزَّاقُ ذُو ٱلْقُوَّةِ ٱلْمَتِينُ ٥٨)} \[الذاريات]
 
@@ -184,6 +184,7 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 - [AlAdhan API](https://aladhan.com/prayer-times-api)
 - [adhanpy library](https://github.com/alphahm/adhanpy)
 - [hijri-converter library](https://hijri-converter.readthedocs.io/en/stable/index.html)
+- [This README template](https://github.com/othneildrew/Best-README-Template)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -193,7 +194,7 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 [psg]: https://img.shields.io/badge/PySimpleGUI-blue?style=for-the-badge&logo=Python&logoColor=white
 [python-url]: https://python.org
 [psg-url]: https://pysimplegui.org
-[product-screenshot]: images/banner.jpg
+[banner]: images/banner.jpg
 [choose-location]: images/choose-location.png
 [main-window]: images/main-window.png
 [settings-window-app-tab]: images/settings-window.png
