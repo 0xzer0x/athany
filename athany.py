@@ -686,13 +686,14 @@ class Athany:
                                             settings_layout,
                                             icon=self.SETTINGS_ICON,
                                             font=self.GUI_FONT,
+                                            enable_close_attempted_event=True,
                                             keep_on_top=True)
 
             # If 2nd window (settings window) is open, read values from it
             if win2_active:
                 event2, values2 = settings_window.read(timeout=100)
 
-                if event2 in (sg.WIN_CLOSED, "-DONE-"):
+                if event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
                     win2_active = False
                     offset_changed = False
                     action_type = values2.get("-DONE-", None)
