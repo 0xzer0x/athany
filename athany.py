@@ -81,8 +81,12 @@ class Athany:
 
         self.UPCOMING_PRAYERS = []
         self.save_loc_check = False
-        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13", "DarkBlue17", "DarkBrown", "DarkBrown2", "DarkBrown7", "DarkGreen7",
-                                 "DarkGrey2", "DarkGrey5", "DarkGrey8", "DarkGrey10", "DarkGrey11", "DarkGrey13", "DarkPurple7", "DarkTeal10", "DarkTeal11"]
+        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13",
+                                 "DarkBlue17", "DarkBrown", "DarkBrown2",
+                                 "DarkBrown7", "DarkGreen7", "DarkGrey2",
+                                 "DarkGrey5", "DarkGrey8", "DarkGrey10",
+                                 "DarkGrey11", "DarkGrey13", "DarkPurple7",
+                                 "DarkTeal10", "DarkTeal11"]
         self.API_ENDPOINT = " http://api.aladhan.com/v1/timingsByCity"
         self.FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
         self.calculation_methods = {
@@ -126,6 +130,7 @@ class Athany:
         self.location_api = None
         self.chosen_theme = None
         self.current_fard = None
+        self.current_furood = None
         self.end_of_month_hijri = None
         self.download_thread_active = False
         self.location_win_layout = [
@@ -280,10 +285,10 @@ class Athany:
             with open(json_month_file, mode="w", encoding="utf-8") as f:
                 json.dump(res.json()["data"]["meta"], f)
 
-        with open(json_month_file, encoding="utf-8") as month_prayers:
-            month_data = json.load(month_prayers)
+        with open(json_month_file, encoding="utf-8") as location_metadata:
+            data = json.load(location_metadata)
 
-        return month_data
+        return data
 
     def setup_inital_layout(self):
         """sets the prayer times window layout and
@@ -360,14 +365,16 @@ class Athany:
 
         print("="*50)
 
-    def get_prayers_dict(self, coordinates, date):
+    def get_prayers_dict(self, coordinates, date) -> dict:
         """function to get given date prayer times dictionary
         :param coordinates: (tuple[int,int]) a tuple containing the lat & long coordinates
         :param date: (datetime.datetime) the date to get the prayer times for
+        :return: (dict) dictionary of prayer name-prayer datetime pairs
         """
         if not date:
             date = self.now
-        method = self.calculation_methods.get(self.settings["-method-id-"], 4)
+        method = self.calculation_methods.get(
+            self.settings["-method-id-"], self.calculation_methods[4])
         pt_object = PrayerTimes(coordinates, date, method,
                                 time_zone=ZoneInfo(self.settings["-location-"]["-timezone-"]))
 
@@ -394,7 +401,7 @@ class Athany:
 
     def choose_location_if_not_saved(self) -> dict:
         """function to get & set the user location
-        :return: (dict) dictionary of the current day json data
+        :return: (dict) dictionary of the chosen location json data
         """
         if self.settings["-location-"].get("-coordinates-", None) is None:
             # If there are no saved settings, display the choose location window to set these values
@@ -506,7 +513,7 @@ class Athany:
 
     def display_main_window(self, init_main_layout):
         """Displays the main application window, keeps running until window is closed
-        :param main_win_layout: (list) main application window layout
+        :param init_main_layout: (list) main application window layout
         """
         self.window = sg.Window("Athany: a python athan app",
                                 init_main_layout,
