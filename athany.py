@@ -2,10 +2,14 @@ import os
 import json
 import sys
 import datetime
+from zoneinfo import ZoneInfo
+import hijri_converter
 import requests
 import simpleaudio
 import PySimpleGUI as sg
 from psgtray import SystemTray
+from adhanpy.PrayerTimes import PrayerTimes
+from adhanpy.calculation import CalculationMethod
 if sys.platform != "win32":
     try:
         from bidi.algorithm import get_display
@@ -34,9 +38,11 @@ def display_ar_text(text: str) -> str:
 
 
 def yes_or_no_popup(text="An error occurred, Do you want to restart the application?"):
-    """function to display an error window & prompt the user to try again"""
-    ans, _ = sg.Window("Confirm", [[sg.T(text)],
-                                   [sg.Push(), sg.Yes(s=10), sg.No(s=10)]], keep_on_top=True, disable_close=True).read(close=True)
+    """function to display a popup window & prompt the user to try again"""
+    ans, _ = sg.Window("Confirm",
+                       [[sg.T(text)],
+                        [sg.Push(), sg.Yes(s=10), sg.No(s=10)]],
+                       keep_on_top=True, disable_close=True).read(close=True)
     if ans == "Yes":
         return True
     else:
@@ -63,8 +69,12 @@ class Athany:
             self.settings["-theme-"] = "DarkAmber"
         if not self.settings["-mute-athan-"]:
             self.settings["-mute-athan-"] = False
-        if not self.settings["-last-time-down-12-mons-"]:
-            self.settings["-last-time-down-12-mons-"] = dict()
+        if not self.settings["-location-"]:
+            self.settings["-location-"] = dict()
+        if not self.settings["-offset-"]:
+            self.settings["-offset-"] = {"-Fajr-": 0, "-Sunrise-": 0,
+                                         "-Dhuhr-": 0, "-Asr-": 0,
+                                         "-Maghrib-": 0, "-Isha-": 0}
         if not self.settings["-athan-sound-"] or \
                 self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
             self.settings["-athan-sound-"] = "Default.wav"
@@ -73,8 +83,19 @@ class Athany:
         self.save_loc_check = False
         self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13", "DarkBlue17", "DarkBrown", "DarkBrown2", "DarkBrown7", "DarkGreen7",
                                  "DarkGrey2", "DarkGrey5", "DarkGrey8", "DarkGrey10", "DarkGrey11", "DarkGrey13", "DarkPurple7", "DarkTeal10", "DarkTeal11"]
-        self.API_ENDPOINT = "https://api.aladhan.com/v1/calendarByCity"
+        self.API_ENDPOINT = " http://api.aladhan.com/v1/timingsByCity"
         self.FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
+        self.calculation_methods = {
+            1: CalculationMethod.KARACHI,
+            2: CalculationMethod.NORTH_AMERICA,
+            3: CalculationMethod.MUSLIM_WORLD_LEAGUE,
+            4: CalculationMethod.UMM_AL_QURA,
+            5: CalculationMethod.EGYPTIAN,
+            9: CalculationMethod.KUWAIT,
+            10: CalculationMethod.QATAR,
+            11: CalculationMethod.SINGAPORE,
+            12: CalculationMethod.UOIF
+        }
         with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
             self.AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
@@ -134,10 +155,49 @@ class Athany:
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
 
-        # self.current_m_data will either be a dict (api json response) or None
-        self.current_m_data = self.choose_location_if_not_saved()
+        # self.calculation_data will either be a dict (api json response) or None
+        self.calculation_data = self.choose_location_if_not_saved()
 
     # ------------------------------------- Main Application logic ------------------------------- #
+    @staticmethod
+    def get_current_location() -> tuple[str, str]:
+        """ function that gets the current city and country of the user IP\n
+        :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
+        """
+        try:
+            ipinfo_res = requests.get(
+                "https://ipinfo.io/json", timeout=5)
+
+            if ipinfo_res.status_code == 200:
+                ipinfo_json = ipinfo_res.json()
+                ret_val = (ipinfo_json["city"], ipinfo_json["country"])
+            else:
+                ipgeoloc_res = requests.get(
+                    "https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a", timeout=5)
+
+                if ipgeoloc_res.status_code == 200:
+                    ipgeoloc_json = ipgeoloc_res.json()
+                    ret_val = (ipgeoloc_json["city"],
+                               ipgeoloc_json["country_code2"])
+                else:
+                    raise requests.exceptions.ConnectionError
+
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            ret_val = "RequestError"
+
+        return ret_val
+
+    @staticmethod
+    def get_hijri_date(date: datetime.datetime) -> str:
+        """function to return arabic hijri date string to display in main window
+        :param date: (datetime.datetime) date to get hijri date for
+        :return: (str) Arabic string of current Hijri date
+        """
+        hijri_date = hijri_converter.Gregorian(date.year,
+                                               date.month,
+                                               date.day).to_hijri()
+        unformatted_text = f"{hijri_date.day_name(language='ar')} {hijri_date.day} {hijri_date.month_name(language='ar')} {hijri_date.year}"
+        return display_ar_text(text=unformatted_text)
 
     def download_athan(self, athan_filename: str) -> bool:
         """Function to download athans from app bucket
@@ -198,70 +258,19 @@ class Athany:
         play_obj = wave_obj.play()
         return play_obj
 
-    def download_12_months(self):
-        """function that downloads api data for the next 12 months"""
-        if not self.download_thread_active:
-            self.download_thread_active = True
-            download_year = self.now.year
-            for mon_d in range(1, 13):
-                download_mon = (mon_d + self.now.month) % 12
-                if download_mon == 0:
-                    download_mon = 12
-                elif download_mon <= self.now.month:
-                    download_year = self.now.year+1
-                downloaded = False
-                while not downloaded:
-                    downloaded = not isinstance(self.fetch_calendar_data(self.settings["-city-"],
-                                                                         self.settings["-country-"],
-                                                                         download_mon,
-                                                                         download_year), str)
-
-            self.settings["-last-time-down-12-mons-"][f"{self.settings['-city-']}-{self.settings['-country-']}"] = f"{self.now.month}-{self.now.year}"
-            self.settings.save()
-            self.download_thread_active = False
-
-    def get_current_location(self) -> tuple[str, str]:
-        """ function that gets the current city and country of the user IP\n
-        :return: (Tuple[str, str]) tuple containing 2 strings of the city & country fetched
-        """
-        try:
-            ipinfo_res = requests.get(
-                "https://ipinfo.io/json", timeout=10)
-
-            if ipinfo_res.status_code == 200:
-                ipinfo_json = ipinfo_res.json()
-                ret_val = (ipinfo_json["city"], ipinfo_json["country"])
-            else:
-                ipgeoloc_res = requests.get(
-                    "https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a", timeout=10)
-
-                if ipgeoloc_res.status_code == 200:
-                    ipgeoloc_json = ipgeoloc_res.json()
-                    ret_val = (ipgeoloc_json["city"],
-                               ipgeoloc_json["country_code2"])
-                else:
-                    raise requests.exceptions.ConnectionError
-
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-            ret_val = "RequestError"
-
-        return ret_val
-
-    def fetch_calendar_data(self, cit: str, count: str, month: str, year: str) -> dict:
-        """check if calendar data for the city+country+month+year exists and fetch it if not
+    def fetch_calculation_data(self, cit: str, count: str) -> dict:
+        """check if location data (coords, timezone) for city+country exists and fetch it if not
         :param cit: (str) city to get data for
         :param count: (str) country to get data for
-        :param month: (str) month to get times for
-        :param year: (str) year to get times for
-        :return: (dict) api response json data dictionary
+        :return: (dict) api response data as dictionary
         """
         json_month_file = os.path.join(
-            self.DATA_DIR, f"{year}-{month}-{cit}-{count}.json")
+            self.DATA_DIR, f"{cit}-{count}.json")
 
         if not os.path.exists(json_month_file):
             try:
                 res = requests.get(
-                    self.API_ENDPOINT+f"?city={cit}&country={count}&month={month}&year={year}", timeout=20)
+                    self.API_ENDPOINT+f"?city={cit}&country={count}", timeout=5)
             except (requests.Timeout, requests.ConnectionError):
                 return "RequestError"
 
@@ -269,86 +278,28 @@ class Athany:
                 return None
 
             with open(json_month_file, mode="w", encoding="utf-8") as f:
-                f.write(res.text)
+                json.dump(res.json()["data"]["meta"], f)
 
         with open(json_month_file, encoding="utf-8") as month_prayers:
             month_data = json.load(month_prayers)
 
         return month_data
 
-    def get_hijri_date_from_json(self, date: datetime.datetime, api_res) -> str:
-        """function to return arabic hijri date string to display in main window
-        :param date: (datetime.datetime) date to get hijri date for
-        :param api_res: (dict) api response to extract hijri date from
-        :return: (str) Arabic string of current Hijri date
-        """
-        hijri_date = api_res["data"][date.day - 1]["date"]["hijri"]
-        text = f"{hijri_date['weekday']['ar']} {hijri_date['day']} {hijri_date['month']['ar']} {hijri_date['year']}"
-        return display_ar_text(text=text)
-
-    def set_main_layout_and_tomorrow_prayers(self, api_res: dict):
+    def setup_inital_layout(self):
         """sets the prayer times window layout and
         the inital upcoming prayers on application startup
-        :param api_res: (dict) - adhan api month json response as a dictionary
         """
-        self.now = datetime.datetime.now()
+        self.now = datetime.datetime.now(tz=ZoneInfo(
+            self.settings["-location-"]["-timezone-"]))
         self.tomorrow = self.now+datetime.timedelta(days=1)
-        current_times = api_res["data"][self.now.day-1]["timings"]
 
-        isha_passed = False
+        coords = self.settings["-location-"]["-coordinates-"]
+        self.current_furood = self.get_prayers_dict(coords, self.now)
         # Check if Isha passed as to get the following day timings
         # Prayer times change after Isha athan to the times of the following day
         # if self.now is after current Isha time
-        if self.now > datetime.datetime(self.now.year, self.now.month, self.now.day, hour=int(current_times["Isha"][:2]), minute=int(current_times["Isha"][3:5])):
-            # replace all prayer times with the next day prayers
-            # SPECIAL CASE: if today is the last day in the month, fetch new month calendar
-            if self.tomorrow.day < self.now.day:
-                self.end_of_month_hijri = self.get_hijri_date_from_json(
-                    self.now, api_res=api_res)
-
-                api_res = self.fetch_calendar_data(
-                    self.settings["-city-"],
-                    self.settings["-country-"],
-                    self.tomorrow.month,
-                    self.tomorrow.year)
-
-                while api_res == "RequestError":
-                    keep_trying = yes_or_no_popup(
-                        "Couldn't fetch new month data, try again?")
-                    if not keep_trying:
-                        sys.exit()
-                    else:
-                        api_res = self.fetch_calendar_data(
-                            self.settings["-city-"],
-                            self.settings["-country-"],
-                            self.tomorrow.month,
-                            self.tomorrow.year)
-
-                current_times = api_res["data"][self.tomorrow.day - 1]["timings"]
-                # remove last month data after setting up the new month json file
-                os.remove(os.path.join(
-                    self.DATA_DIR, f"{self.now.year}-{self.now.month}-{self.settings['-city-']}-{self.settings['-country-']}.json"
-                )
-                )
-            else:
-                current_times = api_res["data"][self.now.day]["timings"]
-
-            isha_passed = True
-
-        self.current_m_data = api_res
-        # loop through all prayer times to convert timing to datetime objects
-        for prayer_name, time_str in current_times.items():
-            # to adjust the day, month, year of the prayer datetime object
-            date = self.tomorrow if isha_passed else self.now
-
-            # time_str is in the format "05:24 (EET)"
-            current_times[prayer_name] = datetime.datetime(
-                date.year,
-                date.month,
-                date.day,
-                hour=int(time_str[:2]),
-                minute=int(time_str[3:5])
-            )
+        if self.now > self.current_furood["Isha"]:
+            self.current_furood = self.get_prayers_dict(coords, self.tomorrow)
 
         print(" DEBUG ".center(50, "="))
 
@@ -371,28 +322,27 @@ class Athany:
             ]
         ]
 
-        for prayer, time in current_times.items():  # append upcoming prayers to list
+        for prayer, time in self.current_furood.items():  # append upcoming prayers to list
             # setting the main window layout with the inital prayer times
-            if prayer in self.FUROOD_NAMES or prayer == "Sunrise":
-                self.init_layout.append(
-                    [
-                        sg.Text(f"{prayer}:", key=f"-{prayer.upper()}-",
-                                font=self.GUI_FONT),
-                        sg.Push(),
-                        sg.Text(time.strftime('%I:%M %p'), key=f"-{prayer.upper()}-TIME-",
-                                font=self.GUI_FONT)
-                    ]
-                )
+            self.init_layout.append(
+                [
+                    sg.Text(f"{prayer}:", key=f"-{prayer.upper()}-",
+                            font=self.GUI_FONT),
+                    sg.Push(),
+                    sg.Text(time.strftime('%I:%M %p'), key=f"-{prayer.upper()}-TIME-",
+                            font=self.GUI_FONT)
+                ]
+            )
 
-                print(prayer, time)  # Debugging
-                if self.now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
-                    self.UPCOMING_PRAYERS.append([prayer, time])
-                else:
-                    self.current_fard = [prayer, time]
+            print(prayer, time)  # Debugging
+            if self.now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
+                self.UPCOMING_PRAYERS.append([prayer, time])
+            else:
+                self.current_fard = [prayer, time]
 
         # the rest of the main window layout
         self.init_layout += [
-            [sg.HorizontalSeparator(color="dark brown")],
+            [sg.HorizontalSeparator(color="black")],
             [
                 sg.Button("Settings", key="-SETTINGS-",
                           font=self.BUTTON_FONT),
@@ -406,17 +356,47 @@ class Athany:
         ]
 
         if not self.current_fard:
-            self.current_fard = ["Isha", current_times["Isha"]]
+            self.current_fard = ["Isha", self.current_furood["Isha"]]
 
         print("="*50)
+
+    def get_prayers_dict(self, coordinates, date):
+        """function to get given date prayer times dictionary
+        :param coordinates: (tuple[int,int]) a tuple containing the lat & long coordinates
+        :param date: (datetime.datetime) the date to get the prayer times for
+        """
+        if not date:
+            date = self.now
+        method = self.calculation_methods.get(self.settings["-method-id-"], 4)
+        pt_object = PrayerTimes(coordinates, date, method,
+                                time_zone=ZoneInfo(self.settings["-location-"]["-timezone-"]))
+
+        return {"Fajr": pt_object.fajr
+                + datetime.timedelta(minutes=self.settings["-offset-"]["-Fajr-"]),
+                "Sunrise": pt_object.sunrise
+                + datetime.timedelta(minutes=self.settings["-offset-"]["-Sunrise-"]),
+                "Dhuhr":  pt_object.dhuhr
+                + datetime.timedelta(minutes=self.settings["-offset-"]["-Dhuhr-"]),
+                "Asr": pt_object.asr
+                + datetime.timedelta(minutes=self.settings["-offset-"]["-Asr-"]),
+                "Maghrib": pt_object.maghrib
+                + datetime.timedelta(minutes=self.settings["-offset-"]["-Maghrib-"]),
+                "Isha": pt_object.isha
+                + datetime.timedelta(minutes=self.settings["-offset-"]["-Isha-"])}
+
+    def update_upcoming_prayers(self):
+        """function to update upcoming prayers list from current furood dictionary"""
+        for prayer, time in self.current_furood.items():
+            if self.now < time:
+                self.UPCOMING_PRAYERS.append([prayer, time])
 
     # ----------------------------- Main Windows And SystemTray Functions ------------------------ #
 
     def choose_location_if_not_saved(self) -> dict:
         """function to get & set the user location
-        :return: (dict) dictionary of the current month json data
+        :return: (dict) dictionary of the current day json data
         """
-        if self.settings["-city-"] is None and self.settings["-country-"] is None:
+        if self.settings["-location-"].get("-coordinates-", None) is None:
             # If there are no saved settings, display the choose location window to set these values
             self.choose_location = sg.Window("Athany - set location",
                                              self.location_win_layout,
@@ -425,7 +405,7 @@ class Athany:
             self.choose_location.perform_long_operation(
                 self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
             while True:
-                m_data = False
+                location_data = False
                 event, values = self.choose_location.read()
 
                 if event in (sg.WIN_CLOSED, "-CANCEL-"):
@@ -437,22 +417,22 @@ class Athany:
                     self.choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
                         self.location_api, str) else "(Internet connection required)")
                 else:
-                    if event == "-OK-" and values["-CITY-"].strip() and values["-COUNTRY-"].strip():
+                    if event == "-OK-":
                         city = values["-CITY-"].strip().capitalize()
                         country = values["-COUNTRY-"].strip().capitalize()
+                        if len(city+country) < 4:
+                            continue
                         if len(country) == 2:
                             country = country.upper()
 
                         self.choose_location["-LOC-TXT-"].update(
-                            value=f"Fetching prayer times for {city}, {country}....")
+                            value=f"Fetching location data for {city}, {country}....")
                         self.choose_location.refresh()
 
-                        m_data = self.fetch_calendar_data(city,
-                                                          country,
-                                                          self.now.month,
-                                                          self.now.year)
+                        location_data = self.fetch_calculation_data(city,
+                                                                    country)
 
-                        if m_data is None:  # if invalid city/country dont continue
+                        if location_data is None:  # if invalid city/country dont continue
                             self.choose_location["-LOC-TXT-"].update(
                                 value="Invalid city or country, enter a valid location")
                             self.choose_location["-CITY-"].update(
@@ -474,40 +454,43 @@ class Athany:
                             country = self.location_api[1]
 
                             self.choose_location["-LOC-TXT-"].update(
-                                value=f"Fetching prayer times for {city}, {country}...")
+                                value=f"Fetching location data for {city}, {country}...")
                             self.choose_location.refresh()
 
-                            m_data = self.fetch_calendar_data(city,
-                                                              country,
-                                                              self.now.month,
-                                                              self.now.year)
+                            location_data = self.fetch_calculation_data(city,
+                                                                        country)
 
-                    if not m_data:
+                    if not location_data:
                         continue
 
-                    if m_data == "RequestError":
+                    if location_data == "RequestError":
                         self.choose_location["-LOC-TXT-"].update(
                             value="Internet connection required")
                     else:
-                        self.settings["-city-"] = city
-                        self.settings["-country-"] = country
+                        self.settings["-location-"]["-city-"] = city
+                        self.settings["-location-"]["-country-"] = country
+                        self.settings["-location-"]["-coordinates-"] = (
+                            location_data["latitude"],
+                            location_data["longitude"]
+                        )
+                        self.settings["-location-"]["-timezone-"] = location_data["timezone"]
+                        self.settings.save()
+                        self.settings["-method-id-"] = location_data["method"]["id"]
 
                         self.save_loc_check = values["-SAVE-LOC-CHECK-"]
 
                         # close location choosing window
                         self.close_app_windows()
 
-                        return m_data
+                        return location_data
 
         else:
             self.save_loc_check = True
-            m_data = self.fetch_calendar_data(
-                self.settings["-city-"],
-                self.settings["-country-"],
-                self.now.month,
-                self.now.year)
+            location_data = self.fetch_calculation_data(
+                self.settings["-location-"]["-city-"],
+                self.settings["-location-"]["-country-"])
 
-            return m_data
+            return location_data
 
     def start_system_tray(self, win: sg.Window) -> SystemTray:
         """starts the SystemTray object and instantiates it"s menu and tooltip
@@ -521,12 +504,12 @@ class Athany:
             title="Athany", message="Choose 'Hide Window' or close the window to minimize application to system tray")
         return tray
 
-    def display_main_window(self, main_win_layout):
+    def display_main_window(self, init_main_layout):
         """Displays the main application window, keeps running until window is closed
         :param main_win_layout: (list) main application window layout
         """
         self.window = sg.Window("Athany: a python athan app",
-                                main_win_layout,
+                                init_main_layout,
                                 enable_close_attempted_event=True,
                                 finalize=True)
 
@@ -534,10 +517,11 @@ class Athany:
         win2_active = False
         athan_play_obj = None
         while True:
-            self.now = datetime.datetime.now().replace(microsecond=0)
+            self.now = datetime.datetime.now(tz=ZoneInfo(
+                self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
 
             if self.now >= self.UPCOMING_PRAYERS[0][1]:
-                # remove current fard from list, update remaining time to be 0 before playing athan sound
+                # remove current fard from list & store it
                 self.current_fard = self.UPCOMING_PRAYERS.pop(0)
 
                 if self.current_fard[0] != "Sunrise":
@@ -557,17 +541,17 @@ class Athany:
                     self.window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
                                                               text_color=sg.theme_text_color())
 
-                # If last prayer in list (Isha), then update the whole application with the next day prayers starting from Fajr
+                # If last prayer in list (Isha)
+                # then update the whole application with the next day prayers starting from Fajr
                 if len(self.UPCOMING_PRAYERS) == 0:
-                    self.set_main_layout_and_tomorrow_prayers(
-                        self.fetch_calendar_data(self.settings["-city-"],
-                                                 self.settings["-country-"],
-                                                 self.now.month,
-                                                 self.now.year)
-                    )
-                    for prayer in self.UPCOMING_PRAYERS:
-                        self.window[f"-{prayer[0].upper()}-TIME-"].update(
-                            value=prayer[1].strftime("%I:%M %p"))
+                    self.current_furood = self.get_prayers_dict(
+                        self.settings["-location-"]["-coordinates-"], self.tomorrow)
+
+                    self.update_upcoming_prayers()
+
+                    for prayer, time in self.current_furood.items():
+                        self.window[f"-{prayer.upper()}-TIME-"].update(
+                            value=time.strftime("%I:%M %p"))
 
             # get remaining time till next prayer
             time_d = self.UPCOMING_PRAYERS[0][1] - self.now
@@ -594,14 +578,8 @@ class Athany:
                 value=self.now.strftime("%I:%M %p"))
             self.window["-TODAY-"].update(
                 value=self.now.date().strftime("%a %d %b %y"))
-
-            # update hijri date from api response
-            if self.now.month == self.UPCOMING_PRAYERS[0][1].month:
-                self.window["-TODAY_HIJRI-"].update(
-                    value=self.get_hijri_date_from_json(self.now, api_res=self.current_m_data))
-            else:  # self.end_of_month_hijri will be set by the upcoming prayers function after Isha
-                self.window["-TODAY_HIJRI-"].update(
-                    value=self.end_of_month_hijri)
+            self.window["-TODAY_HIJRI-"].update(
+                value=self.get_hijri_date(self.now))
 
             # update system tray tooltip also
             self.application_tray.set_tooltip(
@@ -633,15 +611,15 @@ class Athany:
                 if athan_play_obj.is_playing():
                     athan_play_obj.stop()
 
-            # if clicked settings button, open up the settings window and read values from it along with the main window
+            # if clicked settings button,
+            # open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
                 current_athan = self.settings["-athan-sound-"]\
                     .split(".")[0].replace("_", " ")
-                last_time_down_12_mons = self.settings['-last-time-down-12-mons-'].get(
-                    f"{self.settings['-city-']}-{self.settings['-country-']}", "never")
 
-                settings_layout = [
+                # tab 1 contains application settings
+                app_settings_tab = [
                     [
                         sg.Text("Mute athan", pad=(5, 0)),
                         sg.Push(),
@@ -651,7 +629,7 @@ class Athany:
                     ],
                     [
                         sg.Text(
-                            f"Save location ({self.settings['-city-']}, {self.settings['-country-']})", pad=(5, 0)),
+                            f"Save location ({self.settings['-location-']['-city-']}, {self.settings['-location-']['-country-']})", pad=(5, 0)),
                         sg.Push(),
                         sg.Button(image_data=self.TOGGLE_ON_B64 if self.save_loc_check else self.TOGGLE_OFF_B64,
                                   key="-TOGGLE-GRAPHIC-", button_color=(sg.theme_background_color(), sg.theme_background_color()),
@@ -669,12 +647,28 @@ class Athany:
                         sg.Push(),
                         sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
                                  readonly=True, default_value=current_athan, font=self.BUTTON_FONT, pad=(5, 10))
+                    ]
+                ]
+
+                # tab 2 contains prayer offset adjustments
+                prayer_offset_tab = [
+                    [sg.Text(f"{prayer_name} offset:"),
+                     sg.Push(), sg.Spin([sz for sz in range(-59, 60)], key=f"-{prayer_name.upper()}-OFFSET-", initial_value=self.settings["-offset-"][f"-{prayer_name}-"])]
+                    for prayer_name in self.current_furood.keys()
+                ]
+
+                settings_layout = [
+                    [
+                        sg.TabGroup([[sg.Tab("app settings", app_settings_tab),
+                                      sg.Tab("prayer time offset (min)", prayer_offset_tab)]])
                     ],
                     [
-                        sg.Button("Download next 12 months data",
-                                  key="-GET-NEXT-12-MON-", disabled=self.download_thread_active or last_time_down_12_mons == f"{self.now.month}-{self.now.year}", font=self.BUTTON_FONT),
-                        sg.Text(f"last updated: {last_time_down_12_mons}", key="-DOWN-12-MON-PROG-",
-                                font="Segoe\ UI 8 bold"),
+                        sg.Button("Restart", key="-RESTART-",
+                                  font=self.BUTTON_FONT, s=6, pad=(5, 15)),
+                        sg.Button("Exit", key="-EXIT-",
+                                  font=self.BUTTON_FONT, button_color=(
+                                      'black', '#651C32'),
+                                  s=6, pad=(5, 15)),
                         sg.Push(),
                         sg.Button("Done", key="-DONE-",
                                   font=self.BUTTON_FONT, s=6, pad=(5, 15))
@@ -693,8 +687,36 @@ class Athany:
 
                 if event2 in (sg.WIN_CLOSED, "-DONE-"):
                     win2_active = False
+                    offset_changed = False
+                    action_type = values2.get("-DONE-", None)
+                    print("[DEBUG] Settings exit action:", action_type)
                     self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
+
+                    for prayer in self.current_furood.keys():
+                        pt_offset = settings_window[f"-{prayer.upper()}-OFFSET-"].get()
+                        if self.settings["-offset-"][f"-{prayer}-"] != pt_offset:
+                            self.settings["-offset-"][f"-{prayer}-"] = pt_offset
+                            self.settings.save()
+                            offset_changed = True
+
                     settings_window.close()
+
+                    if offset_changed:
+                        self.restart_app = yes_or_no_popup(
+                            "Prayer offsets were changed, do you want to restart application?")
+
+                    if action_type == "-RESTART-" or self.restart_app:
+                        self.restart_app = True
+                        if athan_play_obj:
+                            athan_play_obj.stop()
+                        self.window.write_event_value("-EXIT-", None)
+
+                    elif action_type == "-EXIT-":
+                        self.window.write_event_value("-EXIT-", None)
+
+                elif event2 in ("-EXIT-", "-RESTART-"):
+                    settings_window.write_event_value(
+                        "-DONE-", event2)
 
                 elif event2 == "-TOGGLE-MUTE-":
                     settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
@@ -714,16 +736,12 @@ class Athany:
                         self.restart_app = yes_or_no_popup(
                             f"Theme was changed to {self.chosen_theme}, Do you want to restart application?")
                         if self.restart_app:
-                            if athan_play_obj:
-                                athan_play_obj.stop()
-
-                            win2_active = False
-                            self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
-                            settings_window.close()
-                            self.window.write_event_value("-EXIT-", None)
+                            settings_window.write_event_value(
+                                "-DONE-", "-RESTART-")
 
                 elif event2 == "-DROPDOWN-ATHANS-":
-                    # get a list of all athans currently in folder as user might have downloaded before
+                    # get a list of all athans currently in folder
+                    # as user might have downloaded before
                     DOWNLOADED_ATHANS = os.listdir(self.ATHANS_DIR)
                     # convert option into filename
                     chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
@@ -766,21 +784,6 @@ class Athany:
                     print("[DEBUG] Current athan:",
                           self.settings["-athan-sound-"])
 
-                # this event will fire only if the button is enabled
-                # the button won't be enabled if there's a thread already downloading this data
-                # or the function has already been called this month
-                elif event2 == "-GET-NEXT-12-MON-":
-                    settings_window.perform_long_operation(
-                        self.download_12_months, "-DOWNLOADED-12-MONS-")
-                    settings_window["-GET-NEXT-12-MON-"].update(
-                        disabled=True)
-                    settings_window["-DOWN-12-MON-PROG-"].update(
-                        value="Downloading data, please wait...")
-
-                elif event2 == "-DOWNLOADED-12-MONS-":
-                    settings_window["-DOWN-12-MON-PROG-"].update(
-                        value="Download completed successfully")
-
         # close application on exit
         self.close_app_windows()
 
@@ -816,16 +819,14 @@ if __name__ == "__main__":
     while RESTART_APP:
 
         app = Athany()
-        if app.current_m_data:
-            app.set_main_layout_and_tomorrow_prayers(app.current_m_data)
+        if app.calculation_data:
+            app.setup_inital_layout()
             # app.init_layout will be set by the previous line
             app.display_main_window(app.init_layout)
 
             # If user doesn't want to save settings, delete saved entries before closing
             if not app.save_loc_check:
-                if app.settings["-city-"] and app.settings["-country-"]:
-                    app.settings.delete_entry("-city-")
-                    app.settings.delete_entry("-country-")
+                app.settings.delete_entry("-location-")
 
             if app.chosen_theme:  # if user changed theme in settings, save his choice
                 app.settings["-theme-"] = app.chosen_theme

@@ -1,6 +1,9 @@
 PySimpleGUI
 psgtray
+tzdata
+adhanpy
 requests
 simpleaudio
 python-bidi
 arabic-reshaper
+hijri-converter
