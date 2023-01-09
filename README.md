@@ -53,11 +53,11 @@
 
 ## About The Project
 
-[![Athany Screen Shot][banner]](https://github.com/0xzer0x/athany-app/releases/latest)
+[![Athany Screen Shot][banner]][latest-release]
 
 ### قال تعالى: {وَمَا خَلَقْتُ ٱلْجِنَّ وَٱلْإِنسَ إِلَّا لِيَعْبُدُونِ (٥٦) مَآ أُرِيدُ مِنْهُم مِّن رِّزْقٍۢ وَمَآ أُرِيدُ أَن يُطْعِمُونِ (٥٧) إِنَّ ٱللَّهَ هُوَ ٱلرَّزَّاقُ ذُو ٱلْقُوَّةِ ٱلْمَتِينُ (٥٨)} \[الذاريات]
 
-Athany is a lightweight python program for windows and linux that fetches the times for the five mandatory muslim prayers, tells you the time remaining until the next prayer, and plays the athan sound when the prayer time comes.
+Athany is a lightweight python program for windows and linux that calculates the times for the five mandatory muslim prayers, tells you the time remaining until the next prayer, and plays the athan sound when the prayer time comes.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -72,7 +72,7 @@ Athany is a lightweight python program for windows and linux that fetches the ti
 
 ## Getting Started
 
-To get a local copy up and running follow these simple steps.
+Install the [latest stable version][latest-release] using the windows setup provided in the release, If you want the latest code version up and running follow these simple steps.
 
 ### Prerequisites
 
@@ -190,6 +190,7 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 
 <!-- MARKDOWN LINKS & IMAGES -->
 
+[latest-release]: https://github.com/0xzer0x/athany-app/releases/latest
 [python]: https://img.shields.io/badge/Python-yellowgreen?style=for-the-badge&logo=Python&logoColor=white
 [psg]: https://img.shields.io/badge/PySimpleGUI-blue?style=for-the-badge&logo=Python&logoColor=white
 [python-url]: https://python.org
