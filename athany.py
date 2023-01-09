@@ -166,14 +166,14 @@ class Athany:
         """
         try:
             ipinfo_res = requests.get(
-                "https://ipinfo.io/json", timeout=10)
+                "https://ipinfo.io/json", timeout=5)
 
             if ipinfo_res.status_code == 200:
                 ipinfo_json = ipinfo_res.json()
                 ret_val = (ipinfo_json["city"], ipinfo_json["country"])
             else:
                 ipgeoloc_res = requests.get(
-                    "https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a", timeout=10)
+                    "https://api.ipgeolocation.io/ipgeo?apiKey=397b014528ba421cafcc5df4d00c9e9a", timeout=5)
 
                 if ipgeoloc_res.status_code == 200:
                     ipgeoloc_json = ipgeoloc_res.json()
@@ -342,7 +342,7 @@ class Athany:
 
         # the rest of the main window layout
         self.init_layout += [
-            [sg.HorizontalSeparator(color="#0d0d0d")],
+            [sg.HorizontalSeparator(color="black")],
             [
                 sg.Button("Settings", key="-SETTINGS-",
                           font=self.BUTTON_FONT),
@@ -417,14 +417,16 @@ class Athany:
                     self.choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
                         self.location_api, str) else "(Internet connection required)")
                 else:
-                    if event == "-OK-" and values["-CITY-"].strip() and values["-COUNTRY-"].strip():
+                    if event == "-OK-":
                         city = values["-CITY-"].strip().capitalize()
                         country = values["-COUNTRY-"].strip().capitalize()
+                        if len(city+country) < 4:
+                            continue
                         if len(country) == 2:
                             country = country.upper()
 
                         self.choose_location["-LOC-TXT-"].update(
-                            value=f"Fetching prayer times for {city}, {country}....")
+                            value=f"Fetching location data for {city}, {country}....")
                         self.choose_location.refresh()
 
                         location_data = self.fetch_calculation_data(city,
@@ -452,7 +454,7 @@ class Athany:
                             country = self.location_api[1]
 
                             self.choose_location["-LOC-TXT-"].update(
-                                value=f"Fetching prayer times for {city}, {country}...")
+                                value=f"Fetching location data for {city}, {country}...")
                             self.choose_location.refresh()
 
                             location_data = self.fetch_calculation_data(city,
