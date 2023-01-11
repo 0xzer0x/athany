@@ -15,7 +15,7 @@
     <a href="https://github.com/0xzer0x/athany-app"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/0xzer0x/athany-app">View Demo</a>
+    <a href="https://github.com/0xzer0x/athany-app#usage">View Demo</a>
     ·
     <a href="https://github.com/0xzer0x/athany-app/issues">Report Bug</a>
     ·
@@ -129,6 +129,8 @@ the app settings tab has the main app settings (mute athan, saving location, the
 ![settings-window-offset-tab][settings-window-offset-tab]
 
 the offset tab allows you to adjust prayer times by adding/subtracting minutes from the default calculated time
+
+[check out other screenshots](https://github.com/0xzer0x/athany-app/tree/master/images)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
