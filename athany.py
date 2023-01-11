@@ -79,8 +79,8 @@ class Athany:
                 self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
             self.settings["-athan-sound-"] = "Default.wav"
 
-        self.UPCOMING_PRAYERS = []
-        self.save_loc_check = False
+        self.now = datetime.datetime.now()
+        self.tomorrow = self.now+datetime.timedelta(days=1)
         self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13",
                                  "DarkBlue17", "DarkBrown", "DarkBrown2",
                                  "DarkBrown7", "DarkGreen7", "DarkGrey2",
@@ -88,7 +88,8 @@ class Athany:
                                  "DarkGrey11", "DarkGrey13", "DarkPurple7",
                                  "DarkTeal10", "DarkTeal11"]
         self.API_ENDPOINT = " http://api.aladhan.com/v1/timingsByCity"
-        self.FUROOD_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
+        self.displayed_times = ["Fajr", "Sunrise",
+                                "Dhuhr", "Asr", "Maghrib", "Isha"]
         self.calculation_methods = {
             1: CalculationMethod.KARACHI,
             2: CalculationMethod.NORTH_AMERICA,
@@ -100,8 +101,6 @@ class Athany:
             11: CalculationMethod.SINGAPORE,
             12: CalculationMethod.UOIF
         }
-        with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
-            self.AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
         if sys.platform == "win32":
             self.ARABIC_FONT = "Arabic\ Typesetting 20"
@@ -122,17 +121,20 @@ class Athany:
             self.TOGGLE_OFF_B64 = toff.read()
         with open(os.path.join(self.DATA_DIR, "toggle_on.dat"), mode="rb") as ton:
             self.TOGGLE_ON_B64 = ton.read()
+        with open(os.path.join(self.DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
+            self.AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
         sg.theme(self.settings["-theme-"])
         sg.set_global_icon(self.APP_ICON)
-
-        self.restart_app = False
-        self.location_api = None
         self.chosen_theme = None
+        self.location_api = None
+        self.restart_app = False
+        self.save_loc_check = False
+
         self.current_fard = None
+        self.upcoming_prayer = None
         self.current_furood = None
-        self.end_of_month_hijri = None
-        self.download_thread_active = False
+
         self.location_win_layout = [
             [
                 sg.Text("Set your location", size=(50, 1), key="-LOC-TXT-")
@@ -156,9 +158,6 @@ class Athany:
                           key="-CANCEL-", font=self.BUTTON_FONT)
             ]
         ]
-
-        self.now = datetime.datetime.now()
-        self.tomorrow = self.now+datetime.timedelta(days=1)
 
         # self.calculation_data will either be a dict (api json response) or None
         self.calculation_data = self.choose_location_if_not_saved()
@@ -294,17 +293,16 @@ class Athany:
         """sets the prayer times window layout and
         the inital upcoming prayers on application startup
         """
-        self.now = datetime.datetime.now(tz=ZoneInfo(
-            self.settings["-location-"]["-timezone-"]))
+        self.now = datetime.datetime.now(
+            tz=ZoneInfo(self.settings["-location-"]["-timezone-"]))
         self.tomorrow = self.now+datetime.timedelta(days=1)
 
         coords = self.settings["-location-"]["-coordinates-"]
         self.current_furood = self.get_prayers_dict(coords, self.now)
-        # Check if Isha passed as to get the following day timings
+
         # Prayer times change after Isha athan to the times of the following day
-        # if self.now is after current Isha time
-        if self.now > self.current_furood["Isha"]:
-            self.current_furood = self.get_prayers_dict(coords, self.tomorrow)
+        # this sets the current_fard & upcoming prayer times
+        self.update_current_and_next_prayer()
 
         print(" DEBUG ".center(50, "="))
 
@@ -340,10 +338,6 @@ class Athany:
             )
 
             print(prayer, time)  # Debugging
-            if self.now < time:  # adding upcoming prayers from the point of application start, this list will be modified as prayer times pass
-                self.UPCOMING_PRAYERS.append([prayer, time])
-            else:
-                self.current_fard = [prayer, time]
 
         # the rest of the main window layout
         self.init_layout += [
@@ -359,9 +353,6 @@ class Athany:
                 sg.Text(key="-CURRENT-TIME-", font=self.MONO_FONT)
             ]
         ]
-
-        if not self.current_fard:
-            self.current_fard = ["Isha", self.current_furood["Isha"]]
 
         print("="*50)
 
@@ -391,11 +382,47 @@ class Athany:
                 "Isha": pt_object.isha
                 + datetime.timedelta(minutes=self.settings["-offset-"]["-Isha-"])}
 
-    def update_upcoming_prayers(self):
-        """function to update upcoming prayers list from current furood dictionary"""
-        for prayer, time in self.current_furood.items():
-            if self.now < time:
-                self.UPCOMING_PRAYERS.append([prayer, time])
+    def update_current_and_next_prayer(self):
+        """function to set the current & next fard from the furood dict & update the dict used if Isha passed
+        :return: (bool) whether Isha passed (i.e current furood times were changed) or no,
+        in order for the main window to update the prayer times displayed
+        """
+        isha_passed = False
+        self.tomorrow = self.now+datetime.timedelta(days=1)
+
+        # If isha is the current fard, update the furood dict to set the fajr of tomorrow
+        if self.now >= self.current_furood["Isha"]:
+            self.current_fard = ("Isha", self.current_furood["Isha"])
+            self.current_furood = self.get_prayers_dict(
+                self.settings["-location-"]["-coordinates-"], self.tomorrow)
+            self.upcoming_prayer = ("Fajr", self.current_furood["Fajr"])
+            isha_passed = True
+
+        elif self.now >= self.current_furood["Maghrib"]:
+            self.current_fard = ("Maghrib", self.current_furood["Maghrib"])
+            self.upcoming_prayer = ("Isha", self.current_furood["Isha"])
+
+        elif self.now >= self.current_furood["Asr"]:
+            self.current_fard = ("Asr", self.current_furood["Asr"])
+            self.upcoming_prayer = ("Maghrib", self.current_furood["Maghrib"])
+
+        elif self.now >= self.current_furood["Dhuhr"]:
+            self.current_fard = ("Dhuhr", self.current_furood["Dhuhr"])
+            self.upcoming_prayer = ("Asr", self.current_furood["Asr"])
+
+        elif self.now >= self.current_furood["Sunrise"]:
+            self.current_fard = ("Sunrise", self.current_furood["Sunrise"])
+            self.upcoming_prayer = ("Dhuhr", self.current_furood["Dhuhr"])
+
+        elif self.now >= self.current_furood["Fajr"]:
+            self.current_fard = ("Fajr", self.current_furood["Fajr"])
+            self.upcoming_prayer = ("Sunrise", self.current_furood["Sunrise"])
+
+        else:
+            self.current_fard = ("Isha", self.current_furood["Isha"])
+            self.upcoming_prayer = ("Fajr", self.current_furood["Fajr"])
+
+        return isha_passed
 
     # ----------------------------- Main Windows And SystemTray Functions ------------------------ #
 
@@ -524,12 +551,11 @@ class Athany:
         win2_active = False
         athan_play_obj = None
         while True:
-            self.now = datetime.datetime.now(tz=ZoneInfo(
-                self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
+            self.now = datetime.datetime.now(
+                tz=ZoneInfo(self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
 
-            if self.now >= self.UPCOMING_PRAYERS[0][1]:
-                # remove current fard from list & store it
-                self.current_fard = self.UPCOMING_PRAYERS.pop(0)
+            if self.now >= self.upcoming_prayer[1]:
+                prayer_times_changed = self.update_current_and_next_prayer()
 
                 if self.current_fard[0] != "Sunrise":
                     self.application_tray.show_message(
@@ -542,26 +568,21 @@ class Athany:
                         print(
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
 
-                for f in self.FUROOD_NAMES+["Sunrise"]:
+                for f in self.displayed_times:
                     self.window[f"-{f.upper()}-"].update(font=self.GUI_FONT,
                                                          text_color=sg.theme_text_color())
                     self.window[f"-{f.upper()}-TIME-"].update(font=self.GUI_FONT,
                                                               text_color=sg.theme_text_color())
 
-                # If last prayer in list (Isha)
+                # If current_furood dict was changed,
                 # then update the whole application with the next day prayers starting from Fajr
-                if len(self.UPCOMING_PRAYERS) == 0:
-                    self.current_furood = self.get_prayers_dict(
-                        self.settings["-location-"]["-coordinates-"], self.tomorrow)
-
-                    self.update_upcoming_prayers()
-
+                if prayer_times_changed:
                     for prayer, time in self.current_furood.items():
                         self.window[f"-{prayer.upper()}-TIME-"].update(
                             value=time.strftime("%I:%M %p"))
 
             # get remaining time till next prayer
-            time_d = self.UPCOMING_PRAYERS[0][1] - self.now
+            time_d = self.upcoming_prayer[1] - self.now
 
             # Highlight current fard in main window
             if self.current_fard[0] == "Sunrise":
@@ -577,7 +598,7 @@ class Athany:
 
             # update the main window with the next prayer and remaining time
             self.window["-NEXT-PRAYER-"].update(
-                value=f"{self.UPCOMING_PRAYERS[0][0]}", font=self.GUI_FONT+" bold")
+                value=f"{self.upcoming_prayer[0]}", font=self.GUI_FONT+" bold")
             self.window["-TIME-D-"].update(value=str(time_d))
 
             # update the current dates
@@ -590,7 +611,7 @@ class Athany:
 
             # update system tray tooltip also
             self.application_tray.set_tooltip(
-                f"Next prayer: {self.UPCOMING_PRAYERS[0][0]} in {time_d}")
+                f"{self.upcoming_prayer[0]} in {time_d}")
 
             # main event reading
             event1, values1 = self.window.read(timeout=100)
