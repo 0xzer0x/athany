@@ -99,7 +99,8 @@ class Athany:
             9: CalculationMethod.KUWAIT,
             10: CalculationMethod.QATAR,
             11: CalculationMethod.SINGAPORE,
-            12: CalculationMethod.UOIF
+            12: CalculationMethod.UOIF,
+            15: CalculationMethod.MOON_SIGHTING_COMMITTEE,
         }
 
         if sys.platform == "win32":
@@ -783,6 +784,8 @@ class Athany:
 
                     else:  # athan is not on pc, will be downloaded from the internet
                         settings_window["-DONE-"].update(disabled=True)
+                        settings_window["-RESTART-"].update(disabled=True)
+                        settings_window["-EXIT-"].update(disabled=True)
                         settings_window["-DISPLAYED-MSG-"].update(
                             value="Establishing connection...")
                         settings_window.refresh()
@@ -809,6 +812,8 @@ class Athany:
                                 title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
 
                         settings_window["-DONE-"].update(disabled=False)
+                        settings_window["-RESTART-"].update(disabled=False)
+                        settings_window["-EXIT-"].update(disabled=False)
                     # Debugging
                     print("[DEBUG] Current athan:",
                           self.settings["-athan-sound-"])
