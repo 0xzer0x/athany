@@ -176,8 +176,8 @@ class Athany:
         self.location_win_layout = self.translator.adjust_layout_direction([
             [
                 sg.Text(self.translator.translate("Set your location"),
-                        key="-LOC-TXT-", pad=0),
-                sg.Text(key="-LOCATION-NAME-", pad=0),
+                        key="-LOC-TXT-", pad=(0, 5)),
+                sg.Text(key="-LOCATION-NAME-", pad=(0, 5)),
                 sg.Push()
             ],
             [
@@ -409,7 +409,7 @@ class Athany:
                 sg.Text(self.translator.translate(
                     "current time"), font=self.MONO_FONT),
                 sg.Text("~", font=self.MONO_FONT),
-                sg.Text(key="-CURRENT-TIME-", font=self.MONO_FONT)
+                sg.Text(key="-CURRENT-TIME-", font="consolas 9")
             ]
         ]
 
