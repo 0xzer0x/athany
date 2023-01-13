@@ -39,7 +39,12 @@
   "Invalid city or country, enter a valid location": "الموقع الذي أدخلته خاطئ، الرجاء إدخال موقع صحيح",
   "Internet connection required": "يلزم الاتصال بالإنترنت",
   "Prayer offsets were changed, do you want to restart application?": "تم تغيير مواقيت الصلاة، هل تريد إعادة تشغيل البرنامج؟",
-  "Establishing connection...": "الرجاء الانتظار",
+  "Establishing connection...": "...الرجاء الانتظار",
   "Theme was changed, Do you want to restart application?": "تم تغيير نسق البرنامج، هل تريد إعادة تشغيل البرنامج؟",
-  "Language was changed, do you want to restart?": "تم تغيير لغة البرنامج، هل تريد إعادة تشغيل البرنامج؟"
+  "Language was changed, do you want to restart?": "تم تغيير إعدادات اللغة، هل تريد إعادة تشغيل البرنامج؟",
+  "It's time for Fajr prayer": "حان الآن وقت صلاة الفجر",
+  "It's time for Dhuhr prayer": "حان الآن وقت صلاة الظهر",
+  "It's time for Asr prayer": "حان الآن وقت صلاة العصر",
+  "It's time for Maghrib prayer": "حان الآن وقت صلاة المغرب",
+  "It's time for Isha prayer": "حان الآن وقت صلاة العشاء"
 }

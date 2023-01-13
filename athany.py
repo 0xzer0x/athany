@@ -251,6 +251,7 @@ class Athany:
         ans, _ = sg.Window("Confirm",
                            [[sg.T(self.translator.translate(text))],
                             [sg.Push(), sg.Button(self.translator.translate("Yes"), key="Yes", s=10), sg.Button(self.translator.translate("No"), key="No", s=10)]],
+                           font=self.BUTTON_FONT,
                            keep_on_top=True, disable_close=True).read(close=True)
         if ans == "Yes":
             return True
@@ -272,15 +273,16 @@ class Athany:
 
                 progress_layout = self.translator.adjust_layout_direction([
                     [sg.Text(
-                        self.translator.translate("Downloading")), sg.Text(f"{athan_filename} ({file_size//1024} KB)...")],
+                        self.translator.translate("Downloading"), pad=0),
+                        sg.Text(f"{athan_filename} ({file_size//1024} KB)", pad=0)],
                     [sg.ProgressBar(max_value=file_size,
                                     size=(20, 10), expand_x=True, orientation="h", key="-PROGRESS-METER-")],
                     [sg.Push(), sg.Button(
                         self.translator.translate("Cancel"), key="-CANCEL-")]
                 ])
 
-                prog_win = sg.Window("Download athan",
-                                     progress_layout, icon=self.DOWNLOAD_ICON_B64,
+                prog_win = sg.Window("Download athan", progress_layout,
+                                     font=self.BUTTON_FONT, icon=self.DOWNLOAD_ICON_B64,
                                      keep_on_top=True, enable_close_attempted_event=True)
 
                 dl = 0
@@ -642,7 +644,7 @@ class Athany:
 
                 if self.current_fard[0] != "Sunrise":
                     self.application_tray.show_message(
-                        title="Athany", message=f"It's time for {self.current_fard[0]} prayer 🕌")
+                        title="Athany 🕌", message=self.translator.translate(f"It's time for {self.current_fard[0]} prayer"))
                     # play athan sound from user athan sound settings (if athan sound not muted)
                     try:
                         if not self.settings["-mute-athan-"]:
@@ -736,7 +738,7 @@ class Athany:
                         sg.Col(
                             self.translator.adjust_layout_direction([[
                                 sg.Text(self.translator.translate(
-                                    "Mute athan"), pad=(5, 0)),
+                                    "Mute athan"), pad=0),
                                 sg.Push(),
                                 sg.Button(image_data=self.TOGGLE_ON_B64 if self.settings["-mute-athan-"] else self.TOGGLE_OFF_B64,
                                           key="-TOGGLE-MUTE-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
@@ -744,9 +746,9 @@ class Athany:
                             ],
                                 [
                                 sg.Text(self.translator.translate(
-                                    "Save location"), pad=(5, 0)),
+                                    "Save location"), pad=0),
                                 sg.Text(
-                                    f"({self.settings['-location-']['-city-']}, {self.settings['-location-']['-country-']})"),
+                                    f"({self.settings['-location-']['-city-']}, {self.settings['-location-']['-country-']})", pad=0),
                                 sg.Push(),
                                 sg.Button(image_data=self.TOGGLE_ON_B64 if self.save_loc_check else self.TOGGLE_OFF_B64,
                                           key="-TOGGLE-GRAPHIC-", button_color=(sg.theme_background_color(), sg.theme_background_color()),
@@ -771,11 +773,11 @@ class Athany:
                         )
                     ],
                     [
-                        sg.Text(self.translator.translate("Current athan"), pad=(10, 5),
+                        sg.Text(self.translator.translate("Current athan"), pad=(5, 5),
                                 key="-DISPLAYED-MSG-"),
                         sg.Push(),
                         sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
-                                 readonly=True, default_value=current_athan, font=self.BUTTON_FONT, pad=(10, 5))
+                                 readonly=True, s=37, default_value=current_athan, font=self.BUTTON_FONT, pad=(10, 5))
                     ]
                 ])
 
@@ -940,7 +942,7 @@ class Athany:
                         if downloaded:  # if all went well, set as new athan and play audio
                             self.settings["-athan-sound-"] = chosen_athan
                             settings_window["-DISPLAYED-MSG-"].update(
-                                value=self.translator.translate("Current Athan"))
+                                value=self.translator.translate("Current athan"))
                             settings_window.refresh()
 
                             athan_play_obj = self.play_current_athan()
