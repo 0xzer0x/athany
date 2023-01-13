@@ -186,6 +186,7 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 - [AlAdhan API](https://aladhan.com/prayer-times-api)
 - [adhanpy library](https://github.com/alphahm/adhanpy)
 - [hijri-converter library](https://hijri-converter.readthedocs.io/en/stable/index.html)
+- [Muezzin](https://github.com/DBChoco/Muezzin)
 - [This README template](https://github.com/othneildrew/Best-README-Template)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
