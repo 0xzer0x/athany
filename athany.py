@@ -176,8 +176,8 @@ class Athany:
         self.location_win_layout = self.translator.adjust_layout_direction([
             [
                 sg.Text(self.translator.translate("Set your location"),
-                        key="-LOC-TXT-"),
-                sg.Text(key="-LOCATION-NAME-", pad=(0, 0)),
+                        key="-LOC-TXT-", pad=0),
+                sg.Text(key="-LOCATION-NAME-", pad=0),
                 sg.Push()
             ],
             [
