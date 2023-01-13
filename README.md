@@ -201,5 +201,5 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 [banner]: images/banner.jpg
 [choose-location]: images/choose-location.png
 [main-window]: images/main-window.png
-[settings-window-app-tab]: images/settings-window.png
-[settings-window-offset-tab]: images/settings-window-offset-tab.png
+[settings-window-app-tab]: images/athany120-settings-appsettings.png
+[settings-window-offset-tab]: images/athany120-settings-prayeroffset.png
