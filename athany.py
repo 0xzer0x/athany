@@ -272,14 +272,16 @@ class Athany:
 
                 progress_layout = self.translator.adjust_layout_direction([
                     [sg.Text(
-                        self.translator.translate("Downloading")+f" {athan_filename} ({file_size//1024} KB)...")],
+                        self.translator.translate("Downloading")), sg.Text(f"{athan_filename} ({file_size//1024} KB)...")],
                     [sg.ProgressBar(max_value=file_size,
                                     size=(20, 10), expand_x=True, orientation="h", key="-PROGRESS-METER-")],
-                    [sg.Push(), sg.Button(self.translator.translate("Cancel"))]
+                    [sg.Push(), sg.Button(
+                        self.translator.translate("Cancel"), key="-CANCEL-")]
                 ])
 
                 prog_win = sg.Window("Download athan",
-                                     progress_layout, keep_on_top=True, icon=self.DOWNLOAD_ICON_B64, enable_close_attempted_event=True)
+                                     progress_layout, icon=self.DOWNLOAD_ICON_B64,
+                                     keep_on_top=True, enable_close_attempted_event=True)
 
                 dl = 0
                 for chunk in file_data.iter_content(chunk_size=4096):
@@ -288,7 +290,7 @@ class Athany:
 
                     prog_e = prog_win.read(timeout=10)[0]
                     prog_win.make_modal()
-                    if prog_e in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Cancel"):
+                    if prog_e in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-CANCEL-"):
                         file_data.close()
                         raise requests.exceptions.ConnectionError
 
@@ -854,7 +856,7 @@ class Athany:
                     print("[DEBUG] Settings exit action:", action_type)
                     self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
 
-                    for prayer in self.current_furood.keys():
+                    for prayer in self.current_furood:
                         pt_offset = settings_window[f"-{prayer.upper()}-OFFSET-"].get()
                         if self.settings["-offset-"][f"-{prayer}-"] != pt_offset:
                             self.settings["-offset-"][f"-{prayer}-"] = pt_offset
@@ -945,7 +947,7 @@ class Athany:
 
                         else:  # something messed up during download or no internet
                             settings_window["-DISPLAYED-MSG-"].update(
-                                value=self.translator.translate("Current Athan"))
+                                value=self.translator.translate("Current athan"))
                             settings_window["-DROPDOWN-ATHANS-"].update(
                                 value=self.settings["-athan-sound-"].split(".")[0].replace("_", " "))
                             self.application_tray.show_message(
