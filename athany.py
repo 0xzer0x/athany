@@ -136,17 +136,18 @@ class Athany:
             15: CalculationMethod.MOON_SIGHTING_COMMITTEE,
         }
 
-        self.GUI_FONT = "Readex\ Pro 11"
         if sys.platform == "win32":
-            self.HIJRI_DATE_FONT = "Arabic\ Typesetting 20"
+            self.GUI_FONT = ("Readex Pro", 11)
+            self.HIJRI_DATE_FONT = ("Arabic Typesetting", 20)
         else:
-            self.HIJRI_DATE_FONT = "Readex\ Pro 12"
+            self.GUI_FONT = ("Noto Naskh Arabic", 12)
+            self.HIJRI_DATE_FONT = (self.GUI_FONT[0], 12)
         if self.translator.lang == 'ar':
-            self.BUTTON_FONT = "Readex\ Pro 8"
-            self.MONO_FONT = "Readex\ Pro 9"
+            self.BUTTON_FONT = (self.GUI_FONT[0], 8)
+            self.MONO_FONT = (self.GUI_FONT[0], 9)
         else:
-            self.MONO_FONT = "IBM\ Plex\ Mono 10"
-            self.BUTTON_FONT = "Helvetica 9"
+            self.MONO_FONT = ("IBM Plex Mono", 10)
+            self.BUTTON_FONT = ("Helvetica", 9)
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode="rb") as icon:
             self.APP_ICON = icon.read()
@@ -365,9 +366,10 @@ class Athany:
 
         self.init_layout = [
             [
-                sg.Text(key="-TODAY-", font=self.GUI_FONT+" bold"),
+                sg.Text(key="-TODAY-",
+                        font=(self.GUI_FONT[0], self.GUI_FONT[1], "bold")),
                 sg.Push(),
-                sg.Text(sg.SYMBOL_CIRCLE, font="Noto\ Emoji 6"),
+                sg.Text(sg.SYMBOL_CIRCLE, font="Arial 6"),
                 sg.Push(),
                 sg.Text(key="-TODAY_HIJRI-", font=self.HIJRI_DATE_FONT)
             ],
@@ -407,8 +409,8 @@ class Athany:
                 sg.Push(),
                 sg.Text(self.translator.translate(
                     "current time"), font=self.MONO_FONT),
-                sg.Text("~", font=self.MONO_FONT),
-                sg.Text(key="-CURRENT-TIME-", font="IBM\ Plex\ Mono 10")
+                sg.Text("~", font=("IBM Plex Mono", 10)),
+                sg.Text(key="-CURRENT-TIME-", font=("IBM Plex Mono", 10))
             ]
         ]
 
@@ -671,18 +673,18 @@ class Athany:
             # Highlight current fard in main window
             if self.current_fard[0] == "Sunrise":
                 self.window["-FAJR-"].update(
-                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+                    font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
                 self.window["-FAJR-TIME-"].update(
-                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+                    font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
             else:
                 self.window[f"-{self.current_fard[0].upper()}-"].update(
-                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+                    font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
                 self.window[f"-{self.current_fard[0].upper()}-TIME-"].update(
-                    font=self.GUI_FONT+" italic", text_color='#cd8032')
+                    font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
 
             # update the main window with the next prayer and remaining time
             self.window["-NEXT-PRAYER-"].update(
-                value=self.translator.translate(self.upcoming_prayer[0]), font=self.GUI_FONT+" bold")
+                value=self.translator.translate(self.upcoming_prayer[0]), font=(self.GUI_FONT[0], self.GUI_FONT[1], "bold"))
             self.window["-TIME-D-"].update(value=str(time_d))
 
             # update the current dates
