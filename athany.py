@@ -140,7 +140,7 @@ class Athany:
             self.GUI_FONT = ("Readex Pro", 11)
             self.HIJRI_DATE_FONT = ("Arabic Typesetting", 20)
         else:
-            self.GUI_FONT = ("Noto Naskh Arabic", 12)
+            self.GUI_FONT = ("Droid Sans Arabic", 11)
             self.HIJRI_DATE_FONT = (self.GUI_FONT[0], 12)
         if self.translator.lang == 'ar':
             self.BUTTON_FONT = (self.GUI_FONT[0], 8)
@@ -729,7 +729,7 @@ class Athany:
             # open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
-                button_width = 9 if self.translator.lang == 'ar' else 6
+                button_width = 10 if self.translator.lang == 'ar' else 6
                 current_athan = self.settings["-athan-sound-"]\
                     .split(".")[0].replace("_", " ")
 
