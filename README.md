@@ -78,9 +78,11 @@ Install the [latest stable version][latest-release] using the windows setup prov
 
 - Python >= 3.9
 
-- `python-tk` Tkinter package if you're on linux, install it using your package manager.
+- [Fonts][fonts-download-url] used in application.
 
-- [Fonts](https://github.com/0xzer0x/athany-app/releases/download/1.0.0-stable/fonts.zip) used for application.
+- `python-tk` Tkinter package (Linux users only)
+
+- `libappindicator-gtk3` & [appindicator shell extension][gnome-appindicator-ext] if you're using Gnome (Linux users only)
 
 ### Installation
 
@@ -203,3 +205,5 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 [main-window]: images/main-window.png
 [settings-window-app-tab]: images/athany120-settings-appsettings.png
 [settings-window-offset-tab]: images/athany120-settings-prayeroffset.png
+[gnome-appindicator-ext]: https://extensions.gnome.org/extension/615/appindicator-support/
+[fonts-download-url]: https://github.com/0xzer0x/athany-app/releases/download/1.0.0-stable/fonts.zip
