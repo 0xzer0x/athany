@@ -139,14 +139,13 @@ class Athany:
         self.GUI_FONT = "Segoe\ UI 11"
         if sys.platform == "win32":
             self.ARABIC_FONT = "Arabic\ Typesetting 20"
-            self.MONO_FONT = "consolas 10"
         else:
             self.ARABIC_FONT = "Segoe\ UI 12"
-            self.MONO_FONT = "Hack 9"
         if self.translator.lang == 'ar':
             self.BUTTON_FONT = "Segoe\ UI 9"
             self.MONO_FONT = "Segoe\ UI 9"
         else:
+            self.MONO_FONT = "consolas 10"
             self.BUTTON_FONT = "Helvetica 9"
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode="rb") as icon:
