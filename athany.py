@@ -408,7 +408,7 @@ class Athany:
                 sg.Text(self.translator.translate(
                     "current time"), font=self.MONO_FONT),
                 sg.Text("~", font=self.MONO_FONT),
-                sg.Text(key="-CURRENT-TIME-", font="IBM\ Plex\ Mono 9")
+                sg.Text(key="-CURRENT-TIME-", font="IBM\ Plex\ Mono 10")
             ]
         ]
 
