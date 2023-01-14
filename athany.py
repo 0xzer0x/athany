@@ -136,16 +136,16 @@ class Athany:
             15: CalculationMethod.MOON_SIGHTING_COMMITTEE,
         }
 
-        self.GUI_FONT = "Segoe\ UI 11"
+        self.GUI_FONT = "Readex\ Pro 11"
         if sys.platform == "win32":
-            self.ARABIC_FONT = "Arabic\ Typesetting 20"
+            self.HIJRI_DATE_FONT = "Arabic\ Typesetting 20"
         else:
-            self.ARABIC_FONT = "Segoe\ UI 12"
+            self.HIJRI_DATE_FONT = "Readex\ Pro 12"
         if self.translator.lang == 'ar':
-            self.BUTTON_FONT = "Segoe\ UI 9"
-            self.MONO_FONT = "Segoe\ UI 9"
+            self.BUTTON_FONT = "Readex\ Pro 8"
+            self.MONO_FONT = "Readex\ Pro 9"
         else:
-            self.MONO_FONT = "consolas 10"
+            self.MONO_FONT = "IBM\ Plex\ Mono 10"
             self.BUTTON_FONT = "Helvetica 9"
 
         with open(os.path.join(self.DATA_DIR, "app_icon.dat"), mode="rb") as icon:
@@ -249,7 +249,7 @@ class Athany:
         """function to display a popup window & prompt the user to try again"""
         ans, _ = sg.Window("Confirm",
                            [[sg.T(self.translator.translate(text))],
-                            [sg.Push(), sg.Button(self.translator.translate("Yes"), key="Yes", s=10), sg.Button(self.translator.translate("No"), key="No", s=10)]],
+                            [sg.Push(), sg.Button(self.translator.translate("Yes"), key="Yes", s=7), sg.Button(self.translator.translate("No"), key="No", s=7)]],
                            font=self.BUTTON_FONT,
                            keep_on_top=True, disable_close=True).read(close=True)
         if ans == "Yes":
@@ -367,9 +367,9 @@ class Athany:
             [
                 sg.Text(key="-TODAY-", font=self.GUI_FONT+" bold"),
                 sg.Push(),
-                sg.Text(sg.SYMBOL_CIRCLE, font="Segoe\ UI 6"),
+                sg.Text(sg.SYMBOL_CIRCLE, font="Noto\ Emoji 6"),
                 sg.Push(),
-                sg.Text(key="-TODAY_HIJRI-", font=self.ARABIC_FONT)
+                sg.Text(key="-TODAY_HIJRI-", font=self.HIJRI_DATE_FONT)
             ],
             [
                 sg.Text(key="-LEFT-DECORATION-", font=self.GUI_FONT),
@@ -408,7 +408,7 @@ class Athany:
                 sg.Text(self.translator.translate(
                     "current time"), font=self.MONO_FONT),
                 sg.Text("~", font=self.MONO_FONT),
-                sg.Text(key="-CURRENT-TIME-", font="consolas 9")
+                sg.Text(key="-CURRENT-TIME-", font="IBM\ Plex\ Mono 9")
             ]
         ]
 
@@ -727,7 +727,7 @@ class Athany:
             # open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
-                button_width = 12 if self.translator.lang == 'ar' else 6
+                button_width = 9 if self.translator.lang == 'ar' else 6
                 current_athan = self.settings["-athan-sound-"]\
                     .split(".")[0].replace("_", " ")
 
@@ -759,15 +759,15 @@ class Athany:
                                 sg.Text(self.translator.translate("Language")),
                                 sg.Push(),
                                 sg.Combo(enable_events=True, values=["ar", "en"], key="-DROPDOWN-LANG-",
-                                         readonly=True, default_value=self.settings["-lang-"], font=self.BUTTON_FONT)
+                                         readonly=True, default_value=self.settings["-lang-"], font="Helvetica 9")
                             ],
 
                                 [
                                 sg.Text(self.translator.translate(
-                                    "Current theme"), pad=(5, (15, 0))),
+                                    "Current theme"), pad=(5, (10, 0))),
                                 sg.Push(),
                                 sg.Combo(enable_events=True, values=self.available_themes, key="-DROPDOWN-THEMES-",
-                                         readonly=True, default_value=self.settings["-theme-"], font=self.BUTTON_FONT, pad=(5, (15, 0)))
+                                         readonly=True, default_value=self.settings["-theme-"], font="Helvetica 9", pad=(5, (10, 0)))
                             ]])
                         )
                     ],
@@ -776,7 +776,7 @@ class Athany:
                                 key="-DISPLAYED-MSG-"),
                         sg.Push(),
                         sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
-                                 readonly=True, s=37, default_value=current_athan, font=self.BUTTON_FONT, pad=(10, 5))
+                                 readonly=True, s=37, default_value=current_athan, font="Helvetica 9", pad=(10, 5))
                     ]
                 ])
 
