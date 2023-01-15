@@ -3,10 +3,11 @@ import json
 import sys
 import datetime
 from zoneinfo import ZoneInfo
-import hijri_converter
+
 import requests
-import simpleaudio
+import hijri_converter
 import PySimpleGUI as sg
+from pygame import mixer
 from psgtray import SystemTray
 from adhanpy.PrayerTimes import PrayerTimes
 from adhanpy.calculation import CalculationMethod
@@ -173,6 +174,7 @@ class Athany:
         self.upcoming_prayer = None
         self.current_furood = None
 
+        mixer.init()
         self.location_win_layout = self.translator.adjust_layout_direction([
             [
                 sg.Text(self.translator.translate("Set your location"),
@@ -310,15 +312,16 @@ class Athany:
             os.remove(saved_file)
             return False
 
-    def play_current_athan(self) -> simpleaudio.PlayObject:
+    def play_current_athan(self):
         """ fetches current settings for athan and plays the corresponding athan
-        :return: (simpleaudio.PlayObject) play object to control playback of athan
+        :return: (bool) boolean value to represent whether an audio is playing or not
         """
+        mixer.music.unload()
         current_athan_path = os.path.join(
             self.ATHANS_DIR, self.settings["-athan-sound-"])
-        wave_obj = simpleaudio.WaveObject.from_wave_file(current_athan_path)
-        play_obj = wave_obj.play()
-        return play_obj
+        mixer.music.load(current_athan_path, "wav")
+        mixer.music.play()
+        return True
 
     def fetch_calculation_data(self, cit: str, count: str) -> dict:
         """check if location data (coords, timezone) for city+country exists and fetch it if not
@@ -635,7 +638,7 @@ class Athany:
 
         self.application_tray = self.start_system_tray(win=self.window)
         win2_active = False
-        athan_play_obj = None
+        athan_playing = None
         while True:
             self.now = datetime.datetime.now(
                 tz=ZoneInfo(self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
@@ -649,7 +652,7 @@ class Athany:
                     # play athan sound from user athan sound settings (if athan sound not muted)
                     try:
                         if not self.settings["-mute-athan-"]:
-                            athan_play_obj = self.play_current_athan()
+                            athan_playing = self.play_current_athan()
                     except:
                         print(
                             "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
@@ -721,9 +724,8 @@ class Athany:
                 self.window.un_hide()
                 self.window.bring_to_front()
 
-            elif event1 in ("-STOP-ATHAN-", "Stop athan") and athan_play_obj:
-                if athan_play_obj.is_playing():
-                    athan_play_obj.stop()
+            elif event1 in ("-STOP-ATHAN-", "Stop athan") and athan_playing:
+                mixer.music.stop()
 
             # if clicked settings button,
             # open up the settings window and read values from it along with the main window
@@ -873,9 +875,8 @@ class Athany:
                             "Prayer offsets were changed, do you want to restart application?")
 
                     if action_type == "-RESTART-" or self.restart_app:
+                        mixer.music.unload()
                         self.restart_app = True
-                        if athan_play_obj:
-                            athan_play_obj.stop()
                         self.window.write_event_value("-EXIT-", None)
 
                     elif action_type == "-EXIT-":
@@ -923,9 +924,7 @@ class Athany:
 
                     if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
                         self.settings["-athan-sound-"] = chosen_athan
-                        if athan_play_obj:
-                            athan_play_obj.stop()
-                        athan_play_obj = self.play_current_athan()
+                        athan_playing = self.play_current_athan()
 
                     else:  # athan is not on pc, will be downloaded from the internet
                         settings_window["-DONE-"].update(disabled=True)
@@ -935,8 +934,7 @@ class Athany:
                             value=self.translator.translate("Establishing connection..."))
                         settings_window.refresh()
 
-                        if athan_play_obj:
-                            athan_play_obj.stop()
+                        mixer.music.unload()
 
                         # run the download function to get athan from archive
                         downloaded = self.download_athan(chosen_athan)
@@ -946,7 +944,7 @@ class Athany:
                                 value=self.translator.translate("Current athan"))
                             settings_window.refresh()
 
-                            athan_play_obj = self.play_current_athan()
+                            athan_playing = self.play_current_athan()
 
                         else:  # something messed up during download or no internet
                             settings_window["-DISPLAYED-MSG-"].update(

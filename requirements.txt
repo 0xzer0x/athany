@@ -3,7 +3,7 @@ psgtray
 tzdata
 adhanpy
 requests
-simpleaudio
+pygame
 python-bidi
 arabic-reshaper
 hijri-converter
