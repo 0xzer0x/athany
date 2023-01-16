@@ -863,9 +863,9 @@ class Athany:
                             sg.Tab(self.translator.translate(
                                 "general settings"), app_settings_tab),
                             sg.Tab(self.translator.translate(
-                                "prayer times offset (min)"), prayer_offset_tab),
-                            sg.Tab(self.translator.translate(
                                 "custom athan"), custom_athan_tab),
+                            sg.Tab(self.translator.translate(
+                                "prayer times offset (min)"), prayer_offset_tab),
                         ]])
                     ],
                     [
