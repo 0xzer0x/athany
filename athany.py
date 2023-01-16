@@ -844,7 +844,7 @@ class Athany:
                                   border_width=0, metadata=self.settings["-use-custom-athan-"])
                     ],
                     [
-                        sg.Text(os.path.basename(self.settings["-custom-athan-"]),
+                        sg.Text(self.settings["-custom-athan-"],
                                 key="-CUSTOM-ATHAN-NAME-", font=(self.GUI_FONT[0], 10), s=50),
                     ],
                     [
@@ -899,7 +899,7 @@ class Athany:
                     print("[DEBUG] Settings exit action:", action_type)
                     self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
                     self.settings["-custom-athan-"] = settings_window["-CUSTOM-ATHAN-NAME-"].get()
-
+                    print(settings_window["-CUSTOM-ATHAN-NAME-"].get())
                     for prayer in self.current_furood:
                         pt_offset = settings_window[f"-{prayer.upper()}-OFFSET-"].get()
                         if self.settings["-offset-"][f"-{prayer}-"] != pt_offset:
