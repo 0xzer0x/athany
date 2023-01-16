@@ -844,8 +844,8 @@ class Athany:
                                   border_width=0, metadata=self.settings["-use-custom-athan-"])
                     ],
                     [
-                        sg.Text(self.settings["-custom-athan-"],
-                                key="-CUSTOM-ATHAN-NAME-", font=(self.GUI_FONT[0], 10), s=50),
+                        sg.InputText(self.settings["-custom-athan-"], readonly=True, text_color="black",
+                                     key="-CUSTOM-ATHAN-NAME-", font=(self.GUI_FONT[0], 10), expand_x=True),
                     ],
                     [
                         sg.Push(),
