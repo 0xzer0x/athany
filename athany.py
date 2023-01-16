@@ -88,25 +88,26 @@ class Athany:
         self.ATHANS_DIR = os.path.join(self.DATA_DIR, "Athans")
         self.TRANSLATIONS_DIR = os.path.join(self.DATA_DIR, "Translations")
 
-        if not os.path.exists(self.DATA_DIR):
-            os.mkdir(self.DATA_DIR)
-        if not os.path.exists(self.ATHANS_DIR):
-            os.mkdir(self.ATHANS_DIR)
-
         self.settings = sg.UserSettings(
             filename="athany-config.json", path=self.DATA_DIR)
         if not self.settings["-theme-"]:
             self.settings["-theme-"] = "DarkAmber"
         if not self.settings["-lang-"]:
             self.settings["-lang-"] = "en"
-        if not self.settings["-mute-athan-"]:
-            self.settings["-mute-athan-"] = False
+
         if not self.settings["-location-"]:
             self.settings["-location-"] = dict()
         if not self.settings["-offset-"]:
             self.settings["-offset-"] = {"-Fajr-": 0, "-Sunrise-": 0,
                                          "-Dhuhr-": 0, "-Asr-": 0,
                                          "-Maghrib-": 0, "-Isha-": 0}
+
+        if not self.settings["-mute-athan-"]:
+            self.settings["-mute-athan-"] = False
+        if not self.settings["-use-custom-athan-"]:
+            self.settings["-use-custom-athan-"] = False
+        if not self.settings["-custom-athan-"]:
+            self.settings["-custom-athan-"] = "None"
         if not self.settings["-athan-sound-"] or \
                 self.settings["-athan-sound-"] not in os.listdir(self.ATHANS_DIR):
             self.settings["-athan-sound-"] = "Default.wav"
@@ -121,7 +122,7 @@ class Athany:
                                  "DarkGrey5", "DarkGrey8", "DarkGrey10",
                                  "DarkGrey11", "DarkGrey13", "DarkPurple7",
                                  "DarkTeal10", "DarkTeal11"]
-        self.API_ENDPOINT = " http://api.aladhan.com/v1/timingsByCity"
+        self.api_endpoint = " http://api.aladhan.com/v1/timingsByCity"
         self.displayed_times = ["Fajr", "Sunrise",
                                 "Dhuhr", "Asr", "Maghrib", "Isha"]
         self.calculation_methods = {
@@ -317,9 +318,14 @@ class Athany:
         :return: (bool) boolean value to represent whether an audio is playing or not
         """
         mixer.music.unload()
-        current_athan_path = os.path.join(
-            self.ATHANS_DIR, self.settings["-athan-sound-"])
-        mixer.music.load(current_athan_path, "wav")
+
+        if self.settings["-use-custom-athan-"]:
+            mixer.music.load(self.settings["-custom-athan-"])
+        else:
+            current_athan_path = os.path.join(
+                self.ATHANS_DIR, self.settings["-athan-sound-"])
+            mixer.music.load(current_athan_path, "wav")
+
         mixer.music.play()
         return True
 
@@ -335,7 +341,7 @@ class Athany:
         if not os.path.exists(json_month_file):
             try:
                 res = requests.get(
-                    self.API_ENDPOINT+f"?city={cit}&country={count}", timeout=5)
+                    self.api_endpoint+f"?city={cit}&country={count}", timeout=5)
             except (requests.Timeout, requests.ConnectionError):
                 return "RequestError"
 
@@ -725,15 +731,15 @@ class Athany:
                 self.window.bring_to_front()
 
             elif event1 in ("-STOP-ATHAN-", "Stop athan") and athan_playing:
-                mixer.music.stop()
+                mixer.music.unload()
 
             # if clicked settings button,
             # open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
                 button_width = 10 if self.translator.lang == 'ar' else 6
-                current_athan = self.settings["-athan-sound-"]\
-                    .split(".")[0].replace("_", " ")
+                current_athan = "Custom" if self.settings["-use-custom-athan-"] else self.settings["-athan-sound-"][:-4].replace(
+                    "_", " ")
 
                 # tab 1 contains application settings
                 app_settings_tab = self.translator.adjust_layout_direction([
@@ -779,8 +785,10 @@ class Athany:
                         sg.Text(self.translator.translate("Current athan"), pad=(5, 5),
                                 key="-DISPLAYED-MSG-"),
                         sg.Push(),
-                        sg.Combo(enable_events=True, values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
-                                 readonly=True, s=37, default_value=current_athan, font="Helvetica 9", pad=(10, 5))
+                        sg.Combo(disabled=self.settings["-use-custom-athan-"], enable_events=True,
+                                 values=self.AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
+                                 readonly=True, s=37, default_value=current_athan,
+                                 font="Helvetica 9", pad=(10, 5))
                     ]
                 ])
 
@@ -825,10 +833,40 @@ class Athany:
                     ]
                 ])
 
+                # tab 3 containing custom athan settings
+                custom_athan_tab = self.translator.adjust_layout_direction([
+                    [
+                        sg.Text(self.translator.translate(
+                            "Use custom athan"), pad=5),
+                        sg.Push(),
+                        sg.Button(image_data=self.TOGGLE_ON_B64 if self.settings["-use-custom-athan-"] else self.TOGGLE_OFF_B64,
+                                  key="-TOGGLE-CUSTOM-ATHAN-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
+                                  border_width=0, metadata=self.settings["-use-custom-athan-"])
+                    ],
+                    [
+                        sg.Text(os.path.basename(self.settings["-custom-athan-"]),
+                                key="-CUSTOM-ATHAN-NAME-", font=(self.GUI_FONT[0], 10), s=50),
+                    ],
+                    [
+                        sg.Push(),
+                        sg.FileBrowse(button_text=self.translator.translate(
+                            "Browse"), disabled=not self.settings["-use-custom-athan-"], target="-CUSTOM-ATHAN-NAME-",
+                            file_types=(("WAVE audio", ".wav"), ("MP3 audio", ".mp3")), font=(self.GUI_FONT[0], 10), pad=(5, 5),
+                            key="-CUSTOM-ATHAN-BROWSE-")
+                    ],
+
+                ])
+
                 settings_layout = [
                     [
-                        sg.TabGroup([[sg.Tab(self.translator.translate("app settings"), app_settings_tab),
-                                      sg.Tab(self.translator.translate("prayer times offset (min)"), prayer_offset_tab)]])
+                        sg.TabGroup([[
+                            sg.Tab(self.translator.translate(
+                                "general settings"), app_settings_tab),
+                            sg.Tab(self.translator.translate(
+                                "prayer times offset (min)"), prayer_offset_tab),
+                            sg.Tab(self.translator.translate(
+                                "custom athan"), custom_athan_tab),
+                        ]])
                     ],
                     [
                         sg.Button(self.translator.translate("Restart"), key="-RESTART-",
@@ -860,6 +898,7 @@ class Athany:
                     action_type = values2.get("-DONE-", None)
                     print("[DEBUG] Settings exit action:", action_type)
                     self.save_loc_check = settings_window["-TOGGLE-GRAPHIC-"].metadata
+                    self.settings["-custom-athan-"] = settings_window["-CUSTOM-ATHAN-NAME-"].get()
 
                     for prayer in self.current_furood:
                         pt_offset = settings_window[f"-{prayer.upper()}-OFFSET-"].get()
@@ -886,22 +925,41 @@ class Athany:
                     settings_window.write_event_value(
                         "-DONE-", event2)
 
-                elif event2 == "-TOGGLE-MUTE-":
+                elif event2 in "-TOGGLE-MUTE-":
                     settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
                     settings_window["-TOGGLE-MUTE-"].update(
                         image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else self.TOGGLE_OFF_B64)
 
                     self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
 
+                elif event2 == "-TOGGLE-CUSTOM-ATHAN-":
+                    settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata = not settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata
+                    settings_window["-TOGGLE-CUSTOM-ATHAN-"].update(
+                        image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata else self.TOGGLE_OFF_B64)
+
+                    self.settings["-use-custom-athan-"] = settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata
+
+                    settings_window["-DROPDOWN-ATHANS-"].update(
+                        disabled=self.settings["-use-custom-athan-"])
+                    settings_window["-CUSTOM-ATHAN-BROWSE-"].update(
+                        disabled=not self.settings["-use-custom-athan-"])
+
+                    if self.settings["-use-custom-athan-"]:
+                        settings_window["-DROPDOWN-ATHANS-"].update(
+                            value="Custom")
+                    else:
+                        settings_window["-DROPDOWN-ATHANS-"].update(
+                            value=self.settings["-athan-sound-"][:-4].replace("_", " "))
+
                 elif event2 == "-TOGGLE-GRAPHIC-":
                     settings_window["-TOGGLE-GRAPHIC-"].metadata = not settings_window["-TOGGLE-GRAPHIC-"].metadata
                     settings_window["-TOGGLE-GRAPHIC-"].update(
                         image_data=self.TOGGLE_ON_B64 if settings_window["-TOGGLE-GRAPHIC-"].metadata else self.TOGGLE_OFF_B64)
 
-                elif event2 == "-DROPDOWN-LANG-":
+                elif event2 == "-DROPDOWN-LANG-" and self.settings["-lang-"] != values2["-DROPDOWN-LANG-"]:
                     self.settings["-lang-"] = values2["-DROPDOWN-LANG-"]
                     self.restart_app = self.yes_or_no_popup(
-                        "Language was changed, do you want to restart?")
+                        "App language was changed, do you want to restart?")
                     if self.restart_app:
                         settings_window.write_event_value(
                             "-DONE-", "-RESTART-")
@@ -950,7 +1008,7 @@ class Athany:
                             settings_window["-DISPLAYED-MSG-"].update(
                                 value=self.translator.translate("Current athan"))
                             settings_window["-DROPDOWN-ATHANS-"].update(
-                                value=self.settings["-athan-sound-"].split(".")[0].replace("_", " "))
+                                value=self.settings["-athan-sound-"][:-4].replace("_", " "))
                             self.application_tray.show_message(
                                 title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
 
