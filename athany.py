@@ -837,7 +837,7 @@ class Athany:
                 custom_athan_tab = self.translator.adjust_layout_direction([
                     [
                         sg.Text(self.translator.translate(
-                            "Use custom athan"), pad=5),
+                            "Use custom athan sound"), pad=5),
                         sg.Push(),
                         sg.Button(image_data=self.TOGGLE_ON_B64 if self.settings["-use-custom-athan-"] else self.TOGGLE_OFF_B64,
                                   key="-TOGGLE-CUSTOM-ATHAN-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
