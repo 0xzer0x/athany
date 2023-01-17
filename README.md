@@ -12,8 +12,8 @@
   <p align="center">
     a python application to remind you of your purpose
     <br />
-    <a href="https://github.com/0xzer0x/athany-app"><strong>Explore the docs »</strong></a>
     <br />
+    <a href="https://github.com/0xzer0x/athany-app/releases/latest"><img src="https://img.shields.io/github/v/release/0xzer0x/athany-app"></a>
     <br />
     <a href="https://github.com/0xzer0x/athany-app#usage">View Demo</a>
     ·
@@ -89,7 +89,7 @@ Install the [latest stable version][latest-release] using the windows setup prov
 1. Install dependencies (Linux users only)
 
    ```sh
-   sudo apt-get install -y python3-tk python3-dev libasound2-dev
+   sudo apt-get install -y python3-tk python3-dev libappindicator3-1
    ```
 
 2. Clone the repo
@@ -124,9 +124,13 @@ On first launch, the choose-location window will prompt you for a valid location
 
 the settings window can be accessed through the bottom left button
 
-![settings-window-app-tab][settings-window-app-tab]
+![settings-window-general-tab][settings-window-general-tab]
 
-the app settings tab has the main app settings (mute athan, saving location, theme, change/download athan sound)
+the general settings tab has the main app settings (mute athan, saving location, theme, change language, change/download athan sound)
+
+![settings-window-custom-athan-tab][settings-window-custom-athan-tab]
+
+the custom athan tab allows you to choose a local audio file (.wav, .mp3) to play instead of the offered athans
 
 ![settings-window-offset-tab][settings-window-offset-tab]
 
@@ -141,6 +145,7 @@ the offset tab allows you to adjust prayer times by adding/subtracting minutes f
 ## Roadmap
 
 - [ ] make an Android version using `kivy` library
+- [ ] Add translations
 
 See the [open issues](https://github.com/0xzer0x/athany-app/issues) for a full list of proposed features (and known issues).
 
@@ -155,19 +160,13 @@ Contributions are what make the open source community such an amazing place to l
 If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
 Don't forget to give the project a star! Thanks again!
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- LICENSE -->
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -201,9 +200,10 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 [python-url]: https://python.org
 [psg-url]: https://pysimplegui.org
 [banner]: images/banner.jpg
-[choose-location]: images/choose-location.png
-[main-window]: images/main-window.png
-[settings-window-app-tab]: images/athany120-settings-appsettings.png
-[settings-window-offset-tab]: images/athany120-settings-prayeroffset.png
+[choose-location]: images/choose-location-120-en.png
+[main-window]: images/main-window-120-en.png
+[settings-window-general-tab]: images/general-settings-120-en.png
+[settings-window-custom-athan-tab]: images/custom-athan-120-en.png
+[settings-window-offset-tab]: images/offset-tab-120-en.png
 [gnome-appindicator-ext]: https://extensions.gnome.org/extension/615/appindicator-support/
 [fonts-download-url]: https://github.com/0xzer0x/athany-app/releases/download/1.0.0-stable/fonts.zip
