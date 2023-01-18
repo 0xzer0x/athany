@@ -11,70 +11,30 @@ from pygame import mixer
 from psgtray import SystemTray
 from adhanpy.PrayerTimes import PrayerTimes
 from adhanpy.calculation import CalculationMethod
-if sys.platform != "win32":
-    try:
-        from bidi.algorithm import get_display
-        import arabic_reshaper
-        MISSING_ARABIC_MODULES = False
-    except ImportError:
-        MISSING_ARABIC_MODULES = True
-        print("[DEBUG] Couldn't load Arabic text modules, Install arabic text modules to display text correctly")
-else:  # library for system notifications on Windows
+from src.translator import Translator
+if sys.platform == "win32":
+    # library for system notifications on Windows
     import ctypes
     myappid = "athany notifications"
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
+DATA_DIR = os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), "Data")
+ATHANS_DIR = os.path.join(DATA_DIR, "Athans")
+TRANSLATIONS_DIR = os.path.join(DATA_DIR, "Translations")
 
-class Translator:
-    """class that provides an interface for translation & layout adjustment"""
-
-    def __init__(self, lang, trans_files_dir):
-        self.lang = lang
-        self.translation_dict = None
-        self.bidirectional = False
-
-        if lang == 'ar':
-            self.bidirectional = True
-        if lang != 'en':
-            self.translation_dict = json.load(
-                open(os.path.join(trans_files_dir, lang+'_trans.json'), 'r', encoding='utf-8'))
-
-    # ------------------------------------- UI Translation methods ------------------------------- #
-    @staticmethod
-    def display_ar_text(text: str) -> str:
-        """
-        :param text: (str) arabic text to display correctly
-        :return: (str) correctly formatted arabic string
-        """
-        if sys.platform != "win32" and not MISSING_ARABIC_MODULES:
-            ar_txt = arabic_reshaper.reshape(text)
-            bidi_txt = get_display(ar_txt)
-            return bidi_txt
-        else:
-            return text
-
-    def translate(self, sentence):
-        """method to translate the given string in the language of the translator object
-        :param str sentence: string to translate
-        :return str: translated text correctly formatted
-        """
-        if not self.translation_dict:
-            text = sentence
-        else:
-            text = self.display_ar_text(
-                self.translation_dict[sentence]) if self.bidirectional else self.translation_dict[sentence]
-
-        return text
-
-    def adjust_layout_direction(self, layout):
-        """method to correctly display given layout depending on the direction of language
-        :param list[list] layout: PySimpleGUI layout in list format
-        :return list[list]: layout in correct direction
-        """
-        if self.bidirectional:
-            return [x[::-1] for x in layout]
-
-        return layout
+with open(os.path.join(DATA_DIR, "app_icon.dat"), mode="rb") as icon:
+    APP_ICON = icon.read()
+with open(os.path.join(DATA_DIR, "settings.dat"), mode="rb") as icon:
+    SETTINGS_ICON = icon.read()
+with open(os.path.join(DATA_DIR, "download.dat"), mode="rb") as down:
+    DOWNLOAD_ICON_B64 = down.read()
+with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode="rb") as toff:
+    TOGGLE_OFF_B64 = toff.read()
+with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode="rb") as ton:
+    TOGGLE_ON_B64 = ton.read()
+with open(os.path.join(DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
+    AVAILABLE_ADHANS = adhans.read().strip().split("\n")
 
 
 class Athany:
@@ -1097,44 +1057,3 @@ class Athany:
 
         except AttributeError:
             pass
-
-
-# ------------------------------------- Starts The GUI ------------------------------------- #
-
-if __name__ == "__main__":
-    # global app settings
-    DATA_DIR = os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), "Data")
-    ATHANS_DIR = os.path.join(DATA_DIR, "Athans")
-    TRANSLATIONS_DIR = os.path.join(DATA_DIR, "Translations")
-
-    with open(os.path.join(DATA_DIR, "app_icon.dat"), mode="rb") as icon:
-        APP_ICON = icon.read()
-    with open(os.path.join(DATA_DIR, "settings.dat"), mode="rb") as icon:
-        SETTINGS_ICON = icon.read()
-    with open(os.path.join(DATA_DIR, "download.dat"), mode="rb") as down:
-        DOWNLOAD_ICON_B64 = down.read()
-    with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode="rb") as toff:
-        TOGGLE_OFF_B64 = toff.read()
-    with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode="rb") as ton:
-        TOGGLE_ON_B64 = ton.read()
-    with open(os.path.join(DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
-        AVAILABLE_ADHANS = adhans.read().strip().split("\n")
-
-    RESTART_APP = True
-    while RESTART_APP:
-
-        app = Athany()
-        if app.calculation_data:
-            app.setup_inital_layout()
-            # app.init_layout will be set by the previous line
-            app.display_main_window(app.init_layout)
-
-            # If user doesn't want to save settings, delete saved entries before closing
-            if not app.save_loc_check:
-                app.settings.delete_entry("-location-")
-
-            if app.chosen_theme:  # if user changed theme in settings, save his choice
-                app.settings["-theme-"] = app.chosen_theme
-
-        RESTART_APP = app.restart_app

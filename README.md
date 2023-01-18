@@ -107,7 +107,7 @@ Install the [latest stable version][latest-release] using the windows setup prov
 
 4. Run the application
    ```sh
-   python athany.py
+   python main.py
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

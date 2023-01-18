@@ -1,9 +1,11 @@
 .*
+_*
 *.py
 *.txt
-*.zip
+!main.py
 !athany.py
+!translator.py
 !requirements.txt
-Data/*.json
-Data/Athans/*
-!Data/Athans/Default.wav
+src/Data/*.json
+src/Data/Athans/*
+!src/Data/Athans/Default.wav
