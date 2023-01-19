@@ -1010,7 +1010,7 @@ class Athany:
         """Displays the main application window, keeps running until window is closed
         :param init_main_layout: (list) main application window layout
         """
-        mixer.init()
+        mixer.init(frequency=16000)
         self.window = sg.Window("Athany: a python athan app",
                                 init_main_layout,
                                 enable_close_attempted_event=True,
