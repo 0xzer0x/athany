@@ -6,7 +6,7 @@ _*
 !athany.py
 !translator.py
 !requirements.txt
-!available_adhans.txt
+!available_athans.txt
 src/Data/*.json
 src/Data/Athans/*
-!src/Data/Athans/Default.wav
+!src/Data/Athans/Abdul-Basit_(Takbeer_only).mp3

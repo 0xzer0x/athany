@@ -33,8 +33,8 @@ with open(os.path.join(DATA_DIR, "toggle_off.dat"), mode="rb") as toff:
     TOGGLE_OFF_B64 = toff.read()
 with open(os.path.join(DATA_DIR, "toggle_on.dat"), mode="rb") as ton:
     TOGGLE_ON_B64 = ton.read()
-with open(os.path.join(DATA_DIR, "available_adhans.txt"), encoding="utf-8") as adhans:
-    AVAILABLE_ADHANS = adhans.read().strip().split("\n")
+with open(os.path.join(DATA_DIR, "available_athans.txt"), encoding="utf-8") as fd:
+    AVAILABLE_ATHANS = fd.read().strip().split("\n")
 
 
 class Athany:
@@ -65,7 +65,7 @@ class Athany:
             self.settings["-custom-athan-"] = "None"
         if not self.settings["-athan-sound-"] or \
                 self.settings["-athan-sound-"] not in os.listdir(ATHANS_DIR):
-            self.settings["-athan-sound-"] = "Default.wav"
+            self.settings["-athan-sound-"] = "Abdul-Basit_(Takbeer_only).mp3"
 
         self.now = datetime.datetime.now()
         self.tomorrow = self.now+datetime.timedelta(days=1)
@@ -252,7 +252,7 @@ class Athany:
                         key="-DISPLAYED-MSG-"),
                 sg.Push(),
                 sg.Combo(disabled=self.settings["-use-custom-athan-"], enable_events=True,
-                         values=AVAILABLE_ADHANS, key="-DROPDOWN-ATHANS-",
+                         values=AVAILABLE_ATHANS, key="-DROPDOWN-ATHANS-",
                          readonly=True, s=37, default_value=current_athan,
                          font="Helvetica 9", pad=(10, 5))
             ]
@@ -374,7 +374,7 @@ class Athany:
             prog_win = None
             saved_file = os.path.join(ATHANS_DIR, athan_filename)
             with open(saved_file, "wb") as athan_file:
-                file_data = requests.get("https://s3.us-east-1.amazonaws.com/athany-data/"+athan_filename,
+                file_data = requests.get("https://s3.us-east-1.amazonaws.com/athany-data/mp3/"+athan_filename,
                                          stream=True, timeout=10)
                 file_size = int(file_data.headers.get("content-length"))
 
@@ -428,7 +428,7 @@ class Athany:
         else:
             current_athan_path = os.path.join(
                 ATHANS_DIR, self.settings["-athan-sound-"])
-            mixer.music.load(current_athan_path, "wav")
+            mixer.music.load(current_athan_path, "mp3")
 
         mixer.music.play()
         return True
@@ -861,6 +861,7 @@ class Athany:
         """
         win2_active = True
         event2, values2 = settings_window.read(timeout=100)
+        settings_window.disable_debugger()
 
         if event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
             win2_active = False
@@ -948,7 +949,7 @@ class Athany:
             # as user might have downloaded before
             DOWNLOADED_ATHANS = os.listdir(ATHANS_DIR)
             # convert option into filename
-            chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.wav"
+            chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.mp3"
 
             if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
                 self.settings["-athan-sound-"] = chosen_athan
@@ -1015,6 +1016,7 @@ class Athany:
                                 enable_close_attempted_event=True,
                                 finalize=True)
 
+        self.window.disable_debugger()
         if self.translator.bidirectional:
             self.window["-RIGHT-DECORATION-"].update(
                 value=sg.SYMBOL_LEFT_ARROWHEAD)
