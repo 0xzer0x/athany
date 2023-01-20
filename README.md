@@ -14,6 +14,7 @@
     <br />
     <br />
     <a href="https://github.com/0xzer0x/athany-app/releases/latest"><img src="https://img.shields.io/github/v/release/0xzer0x/athany-app"></a>
+    <a href="https://www.codefactor.io/repository/github/0xzer0x/athany-app/overview/master"><img src="https://www.codefactor.io/repository/github/0xzer0x/athany-app/badge/master" alt="CodeFactor" /></a>
     <br />
     <a href="https://github.com/0xzer0x/athany-app#usage">View Demo</a>
     ·
