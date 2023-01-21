@@ -36,7 +36,7 @@
   "general settings": "الإعدادات العامة",
   "prayer times offset (min)": "مواقيت الصلاة",
   "athan settings": "صوت الأذان",
-  "Fetching location data for": "جاري البحث عن بيانات الموقع ل",
+  "Fetching location data for:": "جاري البحث عن بيانات الموقع ل",
   "An error occurred, try entering location manually": "حصل خطأ ما، الرجاء محاوله إدخال الموقع بشكل يدوي",
   "Invalid city or country, enter a valid location": "الموقع الذي أدخلته خاطئ، الرجاء إدخال موقع صحيح",
   "Internet connection required": "يلزم الاتصال بالإنترنت",

@@ -640,7 +640,7 @@ class Athany:
 
                         self.choose_location["-LOC-TXT-"].update(
                             value=self.translator.translate(
-                                'Fetching location data for')
+                                "Fetching location data for:")
                         )
                         self.choose_location["-LOCATION-NAME-"].update(
                             value=f"({city}, {country})")
@@ -676,7 +676,7 @@ class Athany:
 
                             self.choose_location["-LOC-TXT-"].update(
                                 value=self.translator.translate(
-                                    'Fetching location data for')
+                                    "Fetching location data for:")
                             )
                             self.choose_location["-LOCATION-NAME-"].update(
                                 value=f"({city}, {country})")
@@ -691,6 +691,8 @@ class Athany:
                     if location_data == "RequestError":
                         self.choose_location["-LOC-TXT-"].update(
                             value="Internet connection required")
+                        self.choose_location["-LOCATION-NAME-"].update(
+                            value="")
                     else:
                         self.settings["-location-"]["-city-"] = city
                         self.settings["-location-"]["-country-"] = country
