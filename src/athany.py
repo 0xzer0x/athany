@@ -748,6 +748,12 @@ class Athany:
     def highlight_current_fard_in_ui(self):
         """method to highlight the current fard in the main app UI
         """
+        for name in self.displayed_times:
+            self.window[f"-{name.upper()}-"].update(font=self.GUI_FONT,
+                                                    text_color=sg.theme_text_color())
+            self.window[f"-{name.upper()}-TIME-"].update(font=self.GUI_FONT,
+                                                         text_color=sg.theme_text_color())
+
         if self.current_fard[0] == "Sunrise":
             self.window["-FAJR-"].update(
                 font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
@@ -765,12 +771,6 @@ class Athany:
 
         :param bool prayer_times_changed: True if the current_furood dict was changed
         """
-        for name in self.displayed_times:
-            self.window[f"-{name.upper()}-"].update(font=self.GUI_FONT,
-                                                    text_color=sg.theme_text_color())
-            self.window[f"-{name.upper()}-TIME-"].update(font=self.GUI_FONT,
-                                                         text_color=sg.theme_text_color())
-
         # Highlight current fard in main window
         self.highlight_current_fard_in_ui()
 
