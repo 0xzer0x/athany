@@ -489,13 +489,14 @@ class Athany:
                 sg.Text(key="-TODAY_HIJRI-", font=self.HIJRI_DATE_FONT)
             ],
             [
-                sg.Text(key="-LEFT-DECORATION-", font=self.GUI_FONT),
+                sg.Text(key="-LEFT-DECORATION-"),
                 sg.HorizontalSeparator(),
-                sg.Text(key="-NEXT-PRAYER-"),
+                sg.Text(key="-NEXT-PRAYER-",
+                        font=(self.GUI_FONT[0], self.GUI_FONT[1], "bold")),
                 sg.Text(self.translator.translate("in"), font=self.GUI_FONT),
                 sg.Text(font=self.GUI_FONT, key="-TIME-D-"),
                 sg.HorizontalSeparator(),
-                sg.Text(key="-RIGHT-DECORATION-", font=self.GUI_FONT)
+                sg.Text(key="-RIGHT-DECORATION-")
             ]
         ]
 
@@ -798,7 +799,7 @@ class Athany:
 
             # update the main window with the next prayer and remaining time
             self.window["-NEXT-PRAYER-"].update(
-                value=self.translator.translate(self.upcoming_prayer[0]), font=(self.GUI_FONT[0], self.GUI_FONT[1], "bold"))
+                value=self.translator.translate(self.upcoming_prayer[0]))
             self.window["-TIME-D-"].update(value=str(time_d))
 
             # update the current dates
