@@ -834,7 +834,7 @@ class Athany:
                 self.window.hide()
                 self.application_tray.show_icon()
                 self.application_tray.show_message(title="Athany minimized to system tray",
-                                                   message="To completely close the app, choose the 'Exit' button")
+                                                   message="To completely close the app, press 'Exit'")
 
             elif event1 in ("Show Window", sg.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
                 self.window.un_hide()
