@@ -162,12 +162,12 @@ class Athany:
         unformatted_text = f"{hijri_date.day_name(language='ar')} {hijri_date.day} {hijri_date.month_name(language='ar')} {hijri_date.year}"
         return Translator.display_ar_text(text=unformatted_text)
 
-    # ----------------------------- layout generators ----------------------------- #
+    # ----------------------------- window generators ----------------------------- #
 
-    def generate_location_layout(self):
+    def generate_location_window(self):
         """method to generate the location window layout based on the app language
 
-        :return list[list]: generated PySimpleGUI layout list
+        :return PySimpleGUI.Window: choose location window object
         """
         layout = self.translator.adjust_layout_direction([
             [
@@ -197,12 +197,14 @@ class Athany:
             ]
         ])
 
-        return layout
+        return sg.Window("Athany - set location",
+                         layout,
+                         font=self.GUI_FONT)
 
-    def generate_settings_layout(self):
+    def generate_settings_window(self):
         """method to generate the settings window layout based on app language
 
-        :return list[list]: settings window PySimpleGUI layout list
+        :return PySimpleGUI.Window: settings window object
         """
         current_athan = "Custom" if self.settings["-use-custom-athan-"] \
             else self.settings["-athan-sound-"][:-4].replace("_", " ")
@@ -328,20 +330,20 @@ class Athany:
         settings_layout = [
             [
                 sg.TabGroup([[
-                    sg.Tab(self.translator.translate(
-                        "general settings"), app_settings_tab),
-                    sg.Tab(self.translator.translate(
-                        "custom athan"), custom_athan_tab),
-                    sg.Tab(self.translator.translate(
-                        "prayer times offset (min)"), prayer_offset_tab),
-                ]])
+                            sg.Tab(self.translator.translate(
+                                "general settings"), app_settings_tab),
+                            sg.Tab(self.translator.translate(
+                                "custom athan"), custom_athan_tab),
+                            sg.Tab(self.translator.translate(
+                                "prayer times offset (min)"), prayer_offset_tab),
+                            ]])
             ],
             [
                 sg.Button(self.translator.translate("Restart"), key="-RESTART-",
                           font=self.BUTTON_FONT, s=self.settings_button_width, pad=(5, 15)),
                 sg.Button(self.translator.translate("Exit"), key="-EXIT-",
-                          font=self.BUTTON_FONT, button_color=(
-                              'black', '#651C32'),
+                          font=self.BUTTON_FONT,
+                          button_color=('black', '#651C32'),
                           s=self.settings_button_width, pad=(5, 15)),
                 sg.Push(),
                 sg.Button(self.translator.translate("Done"), key="-DONE-",
@@ -349,7 +351,12 @@ class Athany:
             ]
         ]
 
-        return settings_layout
+        return sg.Window("Athany - settings",
+                         settings_layout,
+                         icon=SETTINGS_ICON,
+                         font=self.GUI_FONT,
+                         enable_close_attempted_event=True,
+                         keep_on_top=True)
 
     def yes_or_no_popup(self, text="An error occurred, Do you want to restart the application?"):
         """function to display a popup window & prompt the user to try again"""
@@ -611,10 +618,7 @@ class Athany:
         """
         if self.settings["-location-"].get("-coordinates-", None) is None:
             # If there are no saved settings, display the choose location window to set these values
-            location_win_layout = self.generate_location_layout()
-            self.choose_location = sg.Window("Athany - set location",
-                                             location_win_layout,
-                                             font=self.GUI_FONT)
+            self.choose_location = self.generate_location_window()
 
             self.choose_location.perform_long_operation(
                 self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
@@ -843,13 +847,7 @@ class Athany:
             # open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
-                settings_layout = self.generate_settings_layout()
-                settings_window = sg.Window("Athany - settings",
-                                            settings_layout,
-                                            icon=SETTINGS_ICON,
-                                            font=self.GUI_FONT,
-                                            enable_close_attempted_event=True,
-                                            keep_on_top=True)
+                settings_window = self.generate_settings_window()
 
             # If 2nd window (settings window) is open, run the settings window event handling method
             if win2_active:
@@ -857,7 +855,6 @@ class Athany:
                     settings_window)
             else:
                 settings_window = None
-                settings_layout = None
 
     def handle_settings_window_event(self, settings_window: sg.Window):
         """method for handling events that come from the settings window
