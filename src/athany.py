@@ -855,6 +855,9 @@ class Athany:
             if win2_active:
                 win2_active = self.handle_settings_window_event(
                     settings_window)
+            else:
+                settings_window = None
+                settings_layout = None
 
     def handle_settings_window_event(self, settings_window: sg.Window):
         """method for handling events that come from the settings window
