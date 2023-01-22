@@ -1,11 +1,11 @@
-from src.athany import Athany
+import src.athany
 
 if __name__ == "__main__":
 
     RESTART_APP = True
     while RESTART_APP:
 
-        app = Athany()
+        app = src.athany.Athany()
         if app.calculation_data:
             app.setup_inital_layout()
             # app.init_layout will be set by the previous line
