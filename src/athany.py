@@ -431,7 +431,8 @@ class Athany:
         mixer.music.unload()
 
         if self.settings["-use-custom-athan-"]:
-            mixer.music.load(self.settings["-custom-athan-"])
+            mixer.music.load(
+                self.settings["-custom-athan-"], self.settings["-custom-athan-"][-3:])
         else:
             current_athan_path = os.path.join(
                 ATHANS_DIR, self.settings["-athan-sound-"])
