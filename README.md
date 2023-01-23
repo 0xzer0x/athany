@@ -39,6 +39,7 @@
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
+        <li><a href="#build-from-source">Building from source</a></li>
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
@@ -113,6 +114,17 @@ Install the [latest stable version][latest-release] using the windows setup prov
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+### Building from source
+
+<a name="build-from-source"></a>
+
+- After the installation steps, execute the following commands. You will find the built application folder in the _dist_ directory
+
+```sh
+    pip install pyinstaller
+    pyinstaller --noconfirm --onedir --windowed --icon 'images/athany_icon.ico' --add-data 'src/Data;src/Data' --name 'athany' main.py
+```
+
 <!-- USAGE EXAMPLES -->
 
 ## Usage
@@ -145,8 +157,11 @@ the offset tab allows you to adjust prayer times by adding/subtracting minutes f
 
 ## Roadmap
 
-- [ ] make an Android version using `kivy` library
 - [ ] Add translations
+- [ ] Add advanced settings tab
+  - [ ] change calculation method
+  - [ ] use custom fajr & isha angles
+- [ ] make an Android version using `kivy` library
 
 See the [open issues](https://github.com/0xzer0x/athany-app/issues) for a full list of proposed features (and known issues).
 
@@ -189,6 +204,7 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 - [adhanpy library](https://github.com/alphahm/adhanpy)
 - [hijri-converter library](https://hijri-converter.readthedocs.io/en/stable/index.html)
 - [Muezzin](https://github.com/DBChoco/Muezzin)
+- [Athan audios source](https://www.assabile.com/adhan-call-prayer)
 - [This README template](https://github.com/othneildrew/Best-README-Template)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
