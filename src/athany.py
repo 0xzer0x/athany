@@ -11,6 +11,8 @@ from pygame import mixer
 from psgtray import SystemTray
 from adhanpy.PrayerTimes import PrayerTimes
 from adhanpy.calculation import CalculationMethod
+from adhanpy.calculation import CalculationParameters
+from adhanpy.calculation.PrayerAdjustments import PrayerAdjustments
 from src.translator import Translator
 if sys.platform == "win32":
     # library for system notifications on Windows
@@ -91,6 +93,14 @@ class Athany:
             12: CalculationMethod.UOIF,
             15: CalculationMethod.MOON_SIGHTING_COMMITTEE,
         }
+        self.prayer_offsets = PrayerAdjustments(
+            self.settings["-offset-"]["-Fajr-"],
+            self.settings["-offset-"]["-Sunrise-"],
+            self.settings["-offset-"]["-Dhuhr-"],
+            self.settings["-offset-"]["-Asr-"],
+            self.settings["-offset-"]["-Maghrib-"],
+            self.settings["-offset-"]["-Isha-"]
+        )
 
         if sys.platform == "win32":
             self.GUI_FONT = ("Readex Pro", 11)
@@ -267,15 +277,18 @@ class Athany:
                     self.translator.adjust_layout_direction([
                         [sg.Text(self.translator.translate("Fajr offset")),
                          sg.Push(), sg.Spin(
-                         [sz for sz in range(-59, 60)], key="-FAJR-OFFSET-", initial_value=self.settings["-offset-"]["-Fajr-"])
+                         [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Fajr-"],
+                         key="-FAJR-OFFSET-", readonly=True, text_color="black")
                          ],
                         [sg.Text(self.translator.translate("Sunrise offset")),
                          sg.Push(), sg.Spin(
-                         [sz for sz in range(-59, 60)], key="-SUNRISE-OFFSET-", initial_value=self.settings["-offset-"]["-Sunrise-"])
+                         [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Sunrise-"],
+                         key="-SUNRISE-OFFSET-", readonly=True, text_color="black")
                          ],
                         [sg.Text(self.translator.translate("Dhuhr offset")),
                          sg.Push(), sg.Spin(
-                         [sz for sz in range(-59, 60)], key="-DHUHR-OFFSET-", initial_value=self.settings["-offset-"]["-Dhuhr-"])
+                         [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Dhuhr-"],
+                         key="-DHUHR-OFFSET-", readonly=True, text_color="black")
                          ]
                     ])
 
@@ -285,15 +298,18 @@ class Athany:
                     self.translator.adjust_layout_direction([
                         [sg.Text(self.translator.translate("Asr offset")),
                          sg.Push(), sg.Spin(
-                         [sz for sz in range(-59, 60)], key="-ASR-OFFSET-", initial_value=self.settings["-offset-"]["-Asr-"])
+                         [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Asr-"],
+                         key="-ASR-OFFSET-", readonly=True, text_color="black")
                          ],
                         [sg.Text(self.translator.translate("Maghrib offset")),
                          sg.Push(), sg.Spin(
-                         [sz for sz in range(-59, 60)], key="-MAGHRIB-OFFSET-", initial_value=self.settings["-offset-"]["-Maghrib-"])
+                         [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Maghrib-"],
+                         key="-MAGHRIB-OFFSET-", readonly=True, text_color="black")
                          ],
                         [sg.Text(self.translator.translate("Isha offset")),
                          sg.Push(), sg.Spin(
-                         [sz for sz in range(-59, 60)], key="-ISHA-OFFSET-", initial_value=self.settings["-offset-"]["-Isha-"])
+                         [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Isha-"],
+                         key="-ISHA-OFFSET-", readonly=True, text_color="black")
                          ]
                     ]
                     )
@@ -478,6 +494,7 @@ class Athany:
         self.tomorrow = self.now+datetime.timedelta(days=1)
 
         coords = self.settings["-location-"]["-coordinates-"]
+
         self.current_furood = self.get_prayers_dict(coords, self.now)
 
         # Prayer times change after Isha athan to the times of the following day
@@ -542,31 +559,23 @@ class Athany:
 
         print("="*50)
 
-    def get_prayers_dict(self, coordinates, date) -> dict:
-        """function to get given date prayer times dictionary
+    def get_prayers_dict(self, coordinates, date: datetime.datetime) -> dict:
+        """method to get given date prayer times dictionary
         :param coordinates: (tuple[int,int]) a tuple containing the lat & long coordinates
         :param date: (datetime.datetime) the date to get the prayer times for
         :return: (dict) dictionary of prayer name-prayer datetime pairs
         """
-        if not date:
-            date = self.now
         method = self.calculation_methods.get(
-            self.settings["-method-id-"], self.calculation_methods[4])
-        pt_object = PrayerTimes(coordinates, date, method,
+            self.settings["-default-method-"], self.calculation_methods[4])
+
+        params = CalculationParameters(method,
+                                       adjustments=self.prayer_offsets)
+
+        pt_object = PrayerTimes(coordinates, date,
+                                calculation_parameters=params,
                                 time_zone=ZoneInfo(self.settings["-location-"]["-timezone-"]))
 
-        return {"Fajr": pt_object.fajr
-                + datetime.timedelta(minutes=self.settings["-offset-"]["-Fajr-"]),
-                "Sunrise": pt_object.sunrise
-                + datetime.timedelta(minutes=self.settings["-offset-"]["-Sunrise-"]),
-                "Dhuhr": pt_object.dhuhr
-                + datetime.timedelta(minutes=self.settings["-offset-"]["-Dhuhr-"]),
-                "Asr": pt_object.asr
-                + datetime.timedelta(minutes=self.settings["-offset-"]["-Asr-"]),
-                "Maghrib": pt_object.maghrib
-                + datetime.timedelta(minutes=self.settings["-offset-"]["-Maghrib-"]),
-                "Isha": pt_object.isha
-                + datetime.timedelta(minutes=self.settings["-offset-"]["-Isha-"])}
+        return {name: getattr(pt_object, name.lower()) for name in self.displayed_times}
 
     def update_current_and_next_prayer(self):
         """function to set the current & next fard from the furood dict & update the dict used if Isha passed
@@ -707,7 +716,7 @@ class Athany:
                         )
                         self.settings["-location-"]["-timezone-"] = location_data["timezone"]
                         self.settings.save()
-                        self.settings["-method-id-"] = location_data["method"]["id"]
+                        self.settings["-default-method-"] = location_data["method"]["id"]
 
                         self.save_loc_check = values["-SAVE-LOC-CHECK-"]
 
