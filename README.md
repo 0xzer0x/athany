@@ -114,9 +114,11 @@ Install the [latest stable version][latest-release] using the windows setup prov
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<a name="build-from-source"></a>
+
 ### Building from source
 
-<a name="build-from-source"></a>
+**Replace the single-quotes with double-quotes if you're using windows**
 
 - After the installation steps, execute the following commands. You will find the built application folder in the _dist_ directory
 
