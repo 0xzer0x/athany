@@ -11,9 +11,8 @@ from pygame import mixer
 from psgtray import SystemTray
 from adhanpy.PrayerTimes import PrayerTimes
 from adhanpy.calculation.PrayerAdjustments import PrayerAdjustments
-from adhanpy.calculation.MethodsParameters import methods_parameters
 from adhanpy.calculation import CalculationMethod, CalculationParameters
-from src.elements import TranslatedText, TranslatedButton
+from src.elements import TranslatedText, TranslatedButton, SettingsWindow
 from src.translator import Translator
 if sys.platform == "win32":
     # library for system notifications on Windows
@@ -220,7 +219,7 @@ class Athany:
     def generate_settings_window(self):
         """method to generate the settings window layout based on app language
 
-        :return PySimpleGUI.Window: settings window object
+        :return SettingsWindow: settings window object
         """
         current_athan = "Custom" if self.settings["-use-custom-athan-"] \
             else self.settings["-athan-sound-"][:-4].replace("_", " ")
@@ -300,9 +299,7 @@ class Athany:
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Dhuhr-"],
                          key="-DHUHR-OFFSET-", readonly=True, text_color="black")
                          ]
-                    ])
-
-                ),
+                    ]), pad=((5, 5), (10, 5))),
                 sg.Push(),
                 sg.Col(
                     self.translator.adjust_layout_direction([
@@ -322,8 +319,7 @@ class Athany:
                          key="-ISHA-OFFSET-", readonly=True, text_color="black")
                          ]
                     ]
-                    )
-                )
+                    ), pad=((5, 5), (10, 5)))
             ]
         ])
 
@@ -359,7 +355,7 @@ class Athany:
                 TranslatedText(self.translator,
                                "Calculation method", pad=(5, 10)),
                 sg.Push(),
-                sg.Combo(default_value=method, readonly=True,
+                sg.Combo(default_value=method, readonly=True, s=37,
                          values=[x[1]
                                  for x in self.calculation_methods.values()],
                          key="-DROPDOWN-METHODS-", enable_events=True, pad=(5, 10), font="Helvetica 10")
@@ -412,12 +408,12 @@ class Athany:
             ]
         ]
 
-        return sg.Window("Athany - settings",
-                         settings_layout,
-                         icon=SETTINGS_ICON,
-                         font=self.GUI_FONT,
-                         enable_close_attempted_event=True,
-                         keep_on_top=True)
+        return SettingsWindow(self, title="Athany - settings",
+                              layout=settings_layout,
+                              icon=SETTINGS_ICON,
+                              font=self.GUI_FONT,
+                              enable_close_attempted_event=True,
+                              keep_on_top=True)
 
     def yes_or_no_popup(self, text="Do you want to restart the application?"):
         """function to display a popup window & prompt the user to try again"""
@@ -914,197 +910,9 @@ class Athany:
 
             # If 2nd window (settings window) is open, run the settings window event handling method
             if win2_active:
-                win2_active = self.handle_settings_window_event(
-                    settings_window)
+                win2_active = settings_window.handle_event_loop()
             else:
                 settings_window = None
-
-    def handle_settings_window_event(self, settings_window: sg.Window):
-        """method for handling events that come from the settings window
-
-        :param PySimpleGUI.Window settings_window: the settings window to read values from
-        :return bool: boolean value that indicates whether the settings window is still open or not
-        """
-        win_active = True
-        event2, values2 = settings_window.read(timeout=100)
-        settings_window.disable_debugger()
-
-        if event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
-            win_active = False
-            offset_changed = False
-            action_type = values2.get("-DONE-", None)
-            print("[DEBUG] Settings exit action:", action_type)
-            self.save_loc_check = settings_window["-TOGGLE-SAVE-LOCATION-"].metadata
-            self.settings["-custom-athan-"] = settings_window["-CUSTOM-ATHAN-NAME-"].get()
-
-            for prayer in self.current_furood:
-                pt_offset = settings_window[f"-{prayer.upper()}-OFFSET-"].get()
-                if self.settings["-offset-"][f"-{prayer}-"] != pt_offset:
-                    self.settings["-offset-"][f"-{prayer}-"] = pt_offset
-                    self.settings.save()
-                    offset_changed = True
-
-            settings_window.close()
-
-            if offset_changed:
-                self.restart_app = self.yes_or_no_popup(
-                    "Prayer offsets were changed, do you want to restart application?")
-
-            if action_type == "-RESTART-" or self.restart_app:
-                mixer.music.unload()
-                self.restart_app = True
-                self.window.write_event_value("-EXIT-", None)
-
-            elif action_type == "-EXIT-":
-                self.window.write_event_value("-EXIT-", None)
-
-        elif event2 in ("-EXIT-", "-RESTART-"):
-            settings_window.write_event_value(
-                "-DONE-", event2)
-
-        elif event2 in "-TOGGLE-MUTE-":
-            settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
-            settings_window["-TOGGLE-MUTE-"].update(
-                image_data=TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else TOGGLE_OFF_B64)
-
-            self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
-
-        elif event2 == "-TOGGLE-CUSTOM-ATHAN-":
-            settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata = not settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata
-            settings_window["-TOGGLE-CUSTOM-ATHAN-"].update(
-                image_data=TOGGLE_ON_B64 if settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata else TOGGLE_OFF_B64)
-
-            self.settings["-use-custom-athan-"] = settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata
-
-            settings_window["-DROPDOWN-ATHANS-"].update(
-                disabled=self.settings["-use-custom-athan-"])
-            settings_window["-CUSTOM-ATHAN-BROWSE-"].update(
-                disabled=not self.settings["-use-custom-athan-"])
-
-            if self.settings["-use-custom-athan-"]:
-                settings_window["-DROPDOWN-ATHANS-"].update(
-                    value="Custom")
-            else:
-                settings_window["-DROPDOWN-ATHANS-"].update(
-                    value=self.settings["-athan-sound-"][:-4].replace("_", " "))
-
-        elif event2 == "-TOGGLE-SAVE-LOCATION-":
-            settings_window["-TOGGLE-SAVE-LOCATION-"].metadata = not settings_window["-TOGGLE-SAVE-LOCATION-"].metadata
-            settings_window["-TOGGLE-SAVE-LOCATION-"].update(
-                image_data=TOGGLE_ON_B64 if settings_window["-TOGGLE-SAVE-LOCATION-"].metadata else TOGGLE_OFF_B64)
-
-        elif event2 == "-DROPDOWN-LANG-" and self.settings["-lang-"] != values2["-DROPDOWN-LANG-"]:
-            self.settings["-lang-"] = values2["-DROPDOWN-LANG-"]
-            self.restart_app = self.yes_or_no_popup(
-                "App language was changed, do you want to restart?")
-            if self.restart_app:
-                settings_window.write_event_value(
-                    "-DONE-", "-RESTART-")
-
-        elif event2 == "-DROPDOWN-THEMES-":
-            self.chosen_theme = values2["-DROPDOWN-THEMES-"]
-            if self.chosen_theme != self.settings["-theme-"]:
-                self.restart_app = self.yes_or_no_popup(
-                    "Theme was changed, Do you want to restart application?")
-                if self.restart_app:
-                    settings_window.write_event_value(
-                        "-DONE-", "-RESTART-")
-
-        elif event2 == "-DROPDOWN-ATHANS-":
-            # get a list of all athans currently in folder
-            # as user might have downloaded before
-            DOWNLOADED_ATHANS = os.listdir(ATHANS_DIR)
-            # convert option into filename
-            chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.mp3"
-
-            if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
-                self.settings["-athan-sound-"] = chosen_athan
-                self.play_current_athan()
-
-            else:  # athan is not on pc, will be downloaded from the internet
-                settings_window["-DONE-"].update(disabled=True)
-                settings_window["-RESTART-"].update(disabled=True)
-                settings_window["-EXIT-"].update(disabled=True)
-                settings_window["-DISPLAYED-MSG-"].update(
-                    value="Establishing connection...")
-                settings_window.refresh()
-
-                mixer.music.unload()
-
-                # run the download function to get athan from archive
-                downloaded = self.download_athan(chosen_athan)
-                if downloaded:  # if all went well, set as new athan and play audio
-                    self.settings["-athan-sound-"] = chosen_athan
-                    settings_window["-DISPLAYED-MSG-"].update(
-                        value="Current athan")
-                    settings_window.refresh()
-
-                    self.play_current_athan()
-
-                else:  # something messed up during download or no internet
-                    settings_window["-DISPLAYED-MSG-"].update(
-                        value="Current athan")
-                    settings_window["-DROPDOWN-ATHANS-"].update(
-                        value=self.settings["-athan-sound-"][:-4].replace("_", " "))
-                    self.application_tray.show_message(
-                        title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
-
-                settings_window["-DONE-"].update(disabled=False)
-                settings_window["-RESTART-"].update(disabled=False)
-                settings_window["-EXIT-"].update(disabled=False)
-            # Debugging
-            print("[DEBUG] Current athan:",
-                  self.settings["-athan-sound-"])
-
-        elif event2 == "-DROPDOWN-METHODS-":
-            self.settings["-used-method-"] = self.get_method_id(
-                values2["-DROPDOWN-METHODS-"])
-
-            if self.settings["-used-method-"] == 99:
-                settings_window["-SET-CUSTOM-ANGLES-"].update(disabled=False)
-                settings_window["-FAJR-ANGLE-IN-"].update(
-                    disabled=False, text_color=sg.theme_input_text_color())
-                settings_window["-ISHA-ANGLE-IN-"].update(
-                    disabled=False, text_color=sg.theme_input_text_color())
-            else:
-                settings_window["-SET-CUSTOM-ANGLES-"].update(disabled=True)
-                used_method = methods_parameters[
-                    self.calculation_methods[self.settings["-used-method-"]][0]]
-                settings_window["-FAJR-ANGLE-IN-"].update(
-                    value=used_method["fajr_angle"], disabled=True, text_color="grey")
-                settings_window["-ISHA-ANGLE-IN-"].update(
-                    value=used_method.get("isha_angle", "not used"), disabled=True, text_color="grey")
-
-            self.current_furood = self.get_prayers_dict(
-                self.settings["-location-"]["-coordinates-"], self.now)
-            self.update_current_and_next_prayer()
-            self.refresh_prayers_in_ui(True)
-
-        elif event2 == "-SET-CUSTOM-ANGLES-":
-            try:
-                fajr = float(settings_window["-FAJR-ANGLE-IN-"].get())
-                isha = float(settings_window["-ISHA-ANGLE-IN-"].get())
-                if fajr < 0 or isha < 0 or fajr > 20 or isha > 20:
-                    raise TypeError
-
-                self.settings["-custom-angles-"] = [fajr, isha]
-                self.current_furood = self.get_prayers_dict(
-                    self.settings["-location-"]["-coordinates-"], self.now)
-                self.update_current_and_next_prayer()
-                self.refresh_prayers_in_ui(True)
-
-                settings_window["-FAJR-ANGLE-IN-"].update(
-                    background_color=sg.theme_input_background_color())
-                settings_window["-ISHA-ANGLE-IN-"].update(
-                    background_color=sg.theme_input_background_color())
-
-            except (TypeError, ValueError):
-                settings_window["-FAJR-ANGLE-IN-"].update(
-                    background_color="dark red")
-                settings_window["-ISHA-ANGLE-IN-"].update(
-                    background_color="dark red")
-
-        return win_active
 
     # ---------------------- startup & shutdown methods ---------------------- #
 
