@@ -159,10 +159,10 @@ the offset tab allows you to adjust prayer times by adding/subtracting minutes f
 
 ## Roadmap
 
+- [x] Add advanced settings tab
+  - [x] change calculation method
+  - [x] use custom fajr & isha angles
 - [ ] Add translations
-- [ ] Add advanced settings tab
-  - [ ] change calculation method
-  - [ ] use custom fajr & isha angles
 - [ ] make an Android version using `kivy` library
 
 See the [open issues](https://github.com/0xzer0x/athany-app/issues) for a full list of proposed features (and known issues).
