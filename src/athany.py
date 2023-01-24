@@ -8,11 +8,10 @@ import requests
 import hijri_converter
 import PySimpleGUI as sg
 from pygame import mixer
-from psgtray import SystemTray
 from adhanpy.PrayerTimes import PrayerTimes
 from adhanpy.calculation.PrayerAdjustments import PrayerAdjustments
 from adhanpy.calculation import CalculationMethod, CalculationParameters
-from src.elements import TranslatedText, TranslatedButton, SettingsWindow
+from src.elements import TranslatedText, TranslatedButton, SettingsWindow, MainWindow, ChooseLocationWindow
 from src.translator import Translator
 if sys.platform == "win32":
     # library for system notifications on Windows
@@ -130,7 +129,7 @@ class Athany:
         self.init_layout = None
         self.current_furood = None
         self.current_fard, self.upcoming_prayer = None, None
-        self.window, self.application_tray = None, None
+        self.window = None
 
         # self.calculation_data will either be a dict (api json response) or None
         self.calculation_data = self.choose_location_if_not_saved()
@@ -212,9 +211,10 @@ class Athany:
             ]
         ])
 
-        return sg.Window("Athany - set location",
-                         layout,
-                         font=self.GUI_FONT)
+        return ChooseLocationWindow(self,
+                                    title="Athany - set location",
+                                    layout=layout,
+                                    font=self.GUI_FONT)
 
     def generate_settings_window(self):
         """method to generate the settings window layout based on app language
@@ -498,6 +498,12 @@ class Athany:
 
     # ---------------------------- calculation methods ---------------------------- #
 
+    def update_time(self):
+        """method to update the 'now' attribute of the application according to the local time
+        """
+        self.now = datetime.datetime.now(
+            tz=ZoneInfo(self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
+
     def fetch_calculation_data(self, cit: str, count: str) -> dict:
         """check if location data (coords, timezone) for city+country exists and fetch it if not
         :param cit: (str) city to get data for
@@ -682,99 +688,7 @@ class Athany:
         if self.settings["-location-"].get("-coordinates-", None) is None:
             # If there are no saved settings, display the choose location window to set these values
             self.choose_location = self.generate_location_window()
-
-            self.choose_location.perform_long_operation(
-                self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
-            while True:
-                location_data = False
-                event, values = self.choose_location.read()
-
-                if event in (sg.WIN_CLOSED, "-CANCEL-"):
-                    self.close_app_windows()
-                    break
-
-                elif event == "-AUTOMATIC-LOCATION-THREAD-":
-                    self.location_api = values["-AUTOMATIC-LOCATION-THREAD-"]
-                    self.choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
-                        self.location_api, str) else f"({self.translator.translate('Internet connection required')})")
-                else:
-                    if event == "-OK-":
-                        city = values["-CITY-"].strip().capitalize()
-                        country = values["-COUNTRY-"].strip().capitalize()
-                        if len(city+country) < 4:
-                            continue
-                        if len(country) == 2:
-                            country = country.upper()
-
-                        self.choose_location["-LOC-TXT-"].update(
-                            value="Fetching location data for:")
-                        self.choose_location["-LOCATION-NAME-"].update(
-                            value=f"({city}, {country})")
-                        self.choose_location.refresh()
-
-                        location_data = self.fetch_calculation_data(city,
-                                                                    country)
-
-                        if location_data is None:  # if invalid city/country dont continue
-                            self.choose_location["-LOC-TXT-"].update(
-                                value="Invalid city or country, enter a valid location")
-                            self.choose_location["-LOCATION-NAME-"].update(
-                                value="")
-                            self.choose_location["-CITY-"].update(
-                                background_color="dark red")
-                            self.choose_location["-COUNTRY-"].update(
-                                background_color="dark red")
-                            continue
-
-                    elif event == "-USE-CURRENT-LOCATION-":
-                        if not isinstance(self.location_api, tuple):
-                            self.location_api = self.get_current_location()
-                        if self.location_api == "RequestError":
-                            self.choose_location["-LOC-TXT-"].update(
-                                value="An error occurred, try entering location manually")
-                            self.choose_location["-LOCATION-NAME-"].update(
-                                value="")
-                            self.choose_location.refresh()
-
-                        else:
-                            city = self.location_api[0]
-                            country = self.location_api[1]
-
-                            self.choose_location["-LOC-TXT-"].update(
-                                value="Fetching location data for:")
-                            self.choose_location["-LOCATION-NAME-"].update(
-                                value=f"({city}, {country})")
-                            self.choose_location.refresh()
-
-                            location_data = self.fetch_calculation_data(city,
-                                                                        country)
-
-                    if not location_data:
-                        continue
-
-                    if location_data == "RequestError":
-                        self.choose_location["-LOC-TXT-"].update(
-                            value="Internet connection required")
-                        self.choose_location["-LOCATION-NAME-"].update(
-                            value="")
-                    else:
-                        self.settings["-location-"]["-city-"] = city
-                        self.settings["-location-"]["-country-"] = country
-                        self.settings["-location-"]["-coordinates-"] = (
-                            location_data["latitude"],
-                            location_data["longitude"]
-                        )
-                        self.settings["-location-"]["-timezone-"] = location_data["timezone"]
-                        self.settings.save()
-                        self.settings["-default-method-"] = location_data["method"]["id"] if location_data["method"]["id"] in self.calculation_methods else 4
-                        self.settings["-used-method-"] = self.settings["-default-method-"]
-
-                        self.save_loc_check = values["-SAVE-LOC-CHECK-"]
-
-                        # close location choosing window
-                        self.close_app_windows()
-
-                        return location_data
+            location_data = self.choose_location.run_event_loop()
 
         else:
             self.save_loc_check = True
@@ -782,161 +696,20 @@ class Athany:
                 self.settings["-location-"]["-city-"],
                 self.settings["-location-"]["-country-"])
 
-            return location_data
-
-    def check_if_prayer_time_came(self):
-        """method to check whether next prayer time came & notify the user if that's the case
-
-        :return bool: whether the upcoming prayer time came or not
-        """
-        self.now = datetime.datetime.now(
-            tz=ZoneInfo(self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
-
-        return self.now >= self.upcoming_prayer[1]
-
-    def show_notification_and_athan(self):
-        """method to send notification to the user and play athan sound when prayer time comes
-        """
-        if self.current_fard[0] != "Sunrise":
-            self.application_tray.show_message(
-                title="Athany 🕌", message=self.translator.translate(f"It's time for {self.current_fard[0]} prayer"))
-
-            # play athan sound from user athan sound settings (if athan sound not muted)
-            if not self.settings["-mute-athan-"]:
-                try:
-                    self.play_current_athan()
-                except RuntimeError:
-                    print(
-                        "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
-
-    def highlight_current_fard_in_ui(self):
-        """method to highlight the current fard in the main app UI
-        """
-        for name in self.displayed_times:
-            self.window[f"-{name.upper()}-"].update(font=self.GUI_FONT,
-                                                    text_color=sg.theme_text_color())
-            self.window[f"-{name.upper()}-TIME-"].update(font=self.GUI_FONT,
-                                                         text_color=sg.theme_text_color())
-
-        if self.current_fard[0] == "Sunrise":
-            self.window["-FAJR-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-            self.window["-FAJR-TIME-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-        else:
-            self.window[f"-{self.current_fard[0].upper()}-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-            self.window[f"-{self.current_fard[0].upper()}-TIME-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-
-    def refresh_prayers_in_ui(self, prayer_times_changed: bool):
-        """method to update the display of the main window depending on the current fard
-            & display tomorrow prayer times if isha passed
-
-        :param bool prayer_times_changed: True if the current_furood dict was changed
-        """
-        # Highlight current fard in main window
-        self.highlight_current_fard_in_ui()
-
-        # If current_furood dict was changed,
-        # then update the ui with the next day prayers starting from Fajr
-        if prayer_times_changed:
-            for prayer, time in self.current_furood.items():
-                self.window[f"-{prayer.upper()}-TIME-"].update(
-                    value=time.strftime("%I:%M %p"))
-
-    # ---------------------------- event handlers ---------------------------- #
-
-    def main_event_loop(self):
-        """main window event handling loop
-        """
-        win2_active = False
-        while True:
-
-            if self.check_if_prayer_time_came():
-                pt_changed = self.update_current_and_next_prayer()
-                self.show_notification_and_athan()
-                self.refresh_prayers_in_ui(pt_changed)
-
-            # get remaining time till next prayer
-            time_d = self.upcoming_prayer[1] - self.now
-
-            # update the main window with the next prayer and remaining time
-            self.window["-NEXT-PRAYER-"].update(value=self.upcoming_prayer[0])
-            self.window["-TIME-D-"].update(value=str(time_d))
-
-            # update the current dates
-            self.window["-CURRENT-TIME-"].update(
-                value=self.now.strftime("%I:%M %p"))
-            self.window["-TODAY-"].update(
-                value=self.now.date().strftime("%a %d %b %y"))
-            self.window["-TODAY_HIJRI-"].update(
-                value=self.get_hijri_date(self.now))
-
-            # update system tray tooltip also
-            self.application_tray.set_tooltip(
-                f"{self.upcoming_prayer[0]} in {time_d}")
-
-            # main event reading
-            event1, values1 = self.window.read(timeout=100)
-
-            if event1 == self.application_tray.key:
-                event1 = values1[event1]
-                # Debugging
-                print("[DEBUG] SystemTray event:", event1)
-
-            # Event check and preform action
-            if event1 in (sg.WIN_CLOSED, "-EXIT-", "Exit"):
-                break
-
-            if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
-                self.window.hide()
-                self.application_tray.show_icon()
-                self.application_tray.show_message(title="Athany minimized to system tray",
-                                                   message="To completely close the app, press 'Exit'")
-
-            elif event1 in ("Show Window", sg.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
-                self.window.un_hide()
-                self.window.bring_to_front()
-
-            elif event1 in ("-STOP-ATHAN-", "Stop athan"):
-                mixer.music.unload()
-
-            # if clicked settings button,
-            # open up the settings window and read values from it along with the main window
-            elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
-                win2_active = True
-                settings_window = self.generate_settings_window()
-
-            # If 2nd window (settings window) is open, run the settings window event handling method
-            if win2_active:
-                win2_active = settings_window.handle_event_loop()
-            else:
-                settings_window = None
+        return location_data
 
     # ---------------------- startup & shutdown methods ---------------------- #
-
-    def start_system_tray(self, win: sg.Window) -> SystemTray:
-        """starts the SystemTray object and instantiates it"s menu and tooltip
-        :return: (psgtray.SystemTray) systemtray object for application
-        """
-        menu = ["", ["Show Window", "Hide Window", "---", "Stop athan",
-                     "Settings", "Exit"]]
-        tray = SystemTray(menu=menu, tooltip="Next Prayer",
-                          window=win, icon=APP_ICON)
-        tray.show_message(
-            title="Athany", message="Choose 'Hide Window' or close the window to minimize application to system tray")
-        return tray
 
     def display_main_window(self, init_main_layout):
         """Displays the main application window, keeps running until window is closed
         :param init_main_layout: (list) main application window layout
         """
         mixer.init(frequency=16000)
-        self.window = sg.Window("Athany: a python athan app",
-                                init_main_layout,
-                                enable_close_attempted_event=True,
-                                finalize=True)
+        self.window = MainWindow(self,
+                                 title="Athany: a python athan app",
+                                 layout=init_main_layout,
+                                 enable_close_attempted_event=True,
+                                 finalize=True)
 
         self.window.disable_debugger()
         if self.translator.bidirectional:
@@ -950,10 +723,10 @@ class Athany:
             self.window["-RIGHT-DECORATION-"].update(
                 value=sg.SYMBOL_RIGHT_ARROWHEAD)
 
-        self.application_tray = self.start_system_tray(win=self.window)
-        self.highlight_current_fard_in_ui()
+        self.window.start_system_tray()
+        self.window.highlight_current_fard_in_ui()
 
-        self.main_event_loop()
+        self.window.main_event_loop()
 
         # when the event loop ends, close the application
         self.close_app_windows()
@@ -961,23 +734,13 @@ class Athany:
     def close_app_windows(self):
         """function to properly close all app windows before shutting down"""
         try:
-
-            if self.choose_location:
-                self.choose_location.close()
-                del self.choose_location
-
+            self.choose_location.close()
+            del self.choose_location
         except AttributeError:
             pass
 
         try:
-
-            if self.application_tray:
-                self.application_tray.close()
-                del self.application_tray
-
-            if self.window:
-                self.window.close()
-                del self.window
-
+            self.window.close()
+            del self.window
         except AttributeError:
             pass
