@@ -5,6 +5,7 @@ _*
 !main.py
 !athany.py
 !translator.py
+!elements.py
 !requirements.txt
 !available_athans.txt
 src/Data/*.json
