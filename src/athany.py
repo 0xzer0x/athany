@@ -503,10 +503,6 @@ class Athany:
         # Prayer times change after Isha athan to the times of the following day
         # this sets the current_fard & upcoming_prayer times
         self.pt.update_current_and_next_prayer()
-        if not self.settings["-used-method-"]:
-            self.settings["-default-method-"] = \
-                self.calculation_data["method"]["id"] if self.calculation_data["method"]["id"] in self.pt.calculation_methods else 4
-            self.settings["-used-method-"] = self.settings["-default-method-"]
 
         print(" DEBUG ".center(50, "="))
 

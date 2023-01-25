@@ -14,7 +14,6 @@ class ModifiedPrayerTimes(PrayerTimes):
 
     def __init__(self, parent, date=datetime.datetime.now()):
         self.parent = parent
-
         self.now = None
         self.update_time()
         self.tomorrow = self.now+datetime.timedelta(days=1)
@@ -45,6 +44,15 @@ class ModifiedPrayerTimes(PrayerTimes):
         }
         self.current_furood = None
         self.current_fard, self.upcoming_fard = None, None
+
+        if not self.parent.settings["-used-method-"]:
+
+            if self.parent.calculation_data["method"]["id"] in self.calculation_methods:
+                self.parent.settings["-default-method-"] = self.parent.calculation_data["method"]["id"]
+            else:
+                self.parent.settings["-default-method-"] = 4
+
+            self.parent.settings["-used-method-"] = self.parent.settings["-default-method-"]
 
         self.update_current_furood(date=date)
 
