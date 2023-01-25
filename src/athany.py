@@ -218,9 +218,7 @@ class Athany:
                         sg.Button(image_data=TOGGLE_ON_B64 if self.save_loc_check else TOGGLE_OFF_B64,
                                   key="-TOGGLE-SAVE-LOCATION-", button_color=(sg.theme_background_color(), sg.theme_background_color()),
                                   border_width=0, pad=(5, 0), metadata=self.save_loc_check)
-                    ]])
-                ),
-                sg.Push(),
+                    ]]), expand_x=True),
                 sg.Col(
                     self.translator.adjust_layout_direction([[
                         TranslatedText(self.translator, "Language"),
@@ -235,8 +233,7 @@ class Athany:
                         sg.Push(),
                         sg.Combo(enable_events=True, values=self.available_themes, key="-DROPDOWN-THEMES-",
                                  readonly=True, default_value=self.settings["-theme-"], font="Helvetica 9", pad=(5, (10, 0)))
-                    ]])
-                )
+                    ]]), expand_x=True)
             ],
             [
                 TranslatedText(self.translator, "Current athan", pad=(5, 5),
