@@ -100,6 +100,7 @@ class Athany:
                                  "DarkGrey11", "DarkGrey13", "DarkPurple7",
                                  "DarkTeal10", "DarkTeal11"]
 
+        self.pt = None
         self.init_layout = None
         self.window = None
 
@@ -498,10 +499,14 @@ class Athany:
         """sets the prayer times window layout and
         the inital upcoming prayers on application startup
         """
-        self.pt = ModifiedPrayerTimes(self, datetime.datetime.now())
+        self.pt = ModifiedPrayerTimes(self)
         # Prayer times change after Isha athan to the times of the following day
         # this sets the current_fard & upcoming_prayer times
         self.pt.update_current_and_next_prayer()
+        if not self.settings["-used-method-"]:
+            self.settings["-default-method-"] = \
+                self.calculation_data["method"]["id"] if self.calculation_data["method"]["id"] in self.pt.calculation_methods else 4
+            self.settings["-used-method-"] = self.settings["-default-method-"]
 
         print(" DEBUG ".center(50, "="))
 

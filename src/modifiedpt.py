@@ -12,7 +12,7 @@ from adhanpy.calculation import CalculationMethod, CalculationParameters
 class ModifiedPrayerTimes(PrayerTimes):
     """Class that provides interface for prayer times, furood & calculation methods"""
 
-    def __init__(self, parent, date: datetime.datetime):
+    def __init__(self, parent, date=datetime.datetime.now()):
         self.parent = parent
 
         self.now = None

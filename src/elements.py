@@ -5,6 +5,7 @@ import PySimpleGUI as sg
 from psgtray import SystemTray
 from adhanpy.calculation.MethodsParameters import methods_parameters
 
+
 DATA_DIR = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), "Data")
 ATHANS_DIR = os.path.join(DATA_DIR, "Athans")
@@ -485,9 +486,6 @@ class ChooseLocationWindow(sg.Window):
                     )
                     self.parent.settings["-location-"]["-timezone-"] = location_data["timezone"]
                     self.parent.settings.save()
-                    self.parent.settings["-default-method-"] = \
-                        location_data["method"]["id"] if location_data["method"]["id"] in self.parent.pt.calculation_methods else 4
-                    self.parent.settings["-used-method-"] = self.parent.settings["-default-method-"]
 
                     self.parent.save_loc_check = values["-SAVE-LOC-CHECK-"]
 
