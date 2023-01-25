@@ -6,12 +6,10 @@ from zoneinfo import ZoneInfo
 
 import requests
 import hijri_converter
-import PySimpleGUI as sg
-from pygame import mixer
-from adhanpy.PrayerTimes import PrayerTimes
-from adhanpy.calculation.PrayerAdjustments import PrayerAdjustments
-from adhanpy.calculation import CalculationMethod, CalculationParameters
-from src.elements import TranslatedText, TranslatedButton, SettingsWindow, MainWindow, ChooseLocationWindow
+from src.elements import sg, mixer
+from src.elements import SettingsWindow, MainWindow, ChooseLocationWindow
+from src.elements import TranslatedText, TranslatedButton
+from src.modifiedpt import ModifiedPrayerTimes
 from src.translator import Translator
 if sys.platform == "win32":
     # library for system notifications on Windows
@@ -40,7 +38,7 @@ with open(os.path.join(DATA_DIR, "available_athans.txt"), encoding="utf-8") as f
 
 class Athany:
     """Python application to fetch prayer times, display them in a GUI and play adhan"""
-    # ------------------------------------- Application Settings --------------------------------- #
+    # ------------------------- default app settings ------------------------- #
 
     def __init__(self) -> None:
         self.settings = sg.UserSettings(
@@ -70,71 +68,45 @@ class Athany:
                 self.settings["-athan-sound-"] not in os.listdir(ATHANS_DIR):
             self.settings["-athan-sound-"] = "Abdul-Basit_(Takbeer_only).mp3"
 
-        self.now = datetime.datetime.now()
-        self.tomorrow = self.now+datetime.timedelta(days=1)
-        self.translator = Translator(self.settings["-lang-"], TRANSLATIONS_DIR)
-        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13",
-                                 "DarkBlue17", "DarkBrown", "DarkBrown2",
-                                 "DarkBrown7", "DarkGreen7", "DarkGrey2",
-                                 "DarkGrey5", "DarkGrey8", "DarkGrey10",
-                                 "DarkGrey11", "DarkGrey13", "DarkPurple7",
-                                 "DarkTeal10", "DarkTeal11"]
-        self.api_endpoint = " http://api.aladhan.com/v1/timingsByCity"
-        self.displayed_times = ["Fajr", "Sunrise",
-                                "Dhuhr", "Asr", "Maghrib", "Isha"]
-        self.prayer_offsets = PrayerAdjustments(
-            self.settings["-offset-"]["-Fajr-"],
-            self.settings["-offset-"]["-Sunrise-"],
-            self.settings["-offset-"]["-Dhuhr-"],
-            self.settings["-offset-"]["-Asr-"],
-            self.settings["-offset-"]["-Maghrib-"],
-            self.settings["-offset-"]["-Isha-"]
-        )
-        self.calculation_methods = {
-            1: (CalculationMethod.KARACHI, "University of Islamic Sciences in Karachi"),
-            2: (CalculationMethod.NORTH_AMERICA, "Islamic Society of North America (ISNA)"),
-            3: (CalculationMethod.MUSLIM_WORLD_LEAGUE, "Muslim World League (MWL)"),
-            4: (CalculationMethod.UMM_AL_QURA, "Umm Al-Qura University in Makkah"),
-            5: (CalculationMethod.EGYPTIAN, "Egyptian General Authority of Survey"),
-            9: (CalculationMethod.KUWAIT, "Kuwait"),
-            10: (CalculationMethod.QATAR, "Qatar"),
-            11: (CalculationMethod.SINGAPORE, "Singapore"),
-            12: (CalculationMethod.UOIF, "UOIF"),
-            15: (CalculationMethod.MOON_SIGHTING_COMMITTEE, "Moonsighting Committee"),
-            99: (CalculationParameters(fajr_angle=self.settings["-custom-angles-"][0],
-                                       isha_angle=self.settings["-custom-angles-"][1],
-                                       adjustments=self.prayer_offsets), "Custom")
-        }
-
         if sys.platform == "win32":
             self.GUI_FONT = ("Readex Pro", 11)
             self.HIJRI_DATE_FONT = ("Arabic Typesetting", 20)
         else:
             self.GUI_FONT = ("Droid Sans Arabic", 11)
             self.HIJRI_DATE_FONT = (self.GUI_FONT[0], 12)
-        if self.translator.lang == 'ar':
+        if self.settings["-lang-"] == 'ar':
             self.BUTTON_FONT = (self.GUI_FONT[0], 8)
             self.MONO_FONT = (self.GUI_FONT[0], 9)
+            self.settings_button_width = 10
         else:
             self.MONO_FONT = ("IBM Plex Mono", 10)
             self.BUTTON_FONT = ("Helvetica", 9)
+            self.settings_button_width = 6
 
-        sg.theme(self.settings["-theme-"])
-        sg.set_global_icon(APP_ICON)
-        self.chosen_theme = None
         self.location_api = None
         self.restart_app, self.save_loc_check = False, False
-        self.settings_button_width = 10 if self.translator.lang == 'ar' else 6
+        self.translator = Translator(self.settings["-lang-"], TRANSLATIONS_DIR)
+        self.api_endpoint = " http://api.aladhan.com/v1/timingsByCity"
+        self.displayed_times = ["Fajr", "Sunrise",
+                                "Dhuhr", "Asr", "Maghrib", "Isha"]
+
+        self.chosen_theme = None
+        sg.set_global_icon(APP_ICON)
+        sg.theme(self.settings["-theme-"])
+        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13",
+                                 "DarkBlue17", "DarkBrown", "DarkBrown2",
+                                 "DarkBrown7", "DarkGreen7", "DarkGrey2",
+                                 "DarkGrey5", "DarkGrey8", "DarkGrey10",
+                                 "DarkGrey11", "DarkGrey13", "DarkPurple7",
+                                 "DarkTeal10", "DarkTeal11"]
 
         self.init_layout = None
-        self.current_furood = None
-        self.current_fard, self.upcoming_prayer = None, None
         self.window = None
 
         # self.calculation_data will either be a dict (api json response) or None
         self.calculation_data = self.choose_location_if_not_saved()
 
-    # ------------------------------------- main application logic ------------------------------- #
+    # ---------------------------- static methods ---------------------------- #
 
     @staticmethod
     def get_current_location() -> tuple[str, str]:
@@ -165,18 +137,15 @@ class Athany:
         return ret_val
 
     @staticmethod
-    def get_hijri_date(date: datetime.datetime) -> str:
+    def get_hijri_date() -> str:
         """function to return arabic hijri date string to display in main window
-        :param date: (datetime.datetime) date to get hijri date for
         :return: (str) Arabic string of current Hijri date
         """
-        hijri_date = hijri_converter.Gregorian(date.year,
-                                               date.month,
-                                               date.day).to_hijri()
+        hijri_date = hijri_converter.Gregorian.today().to_hijri()
         unformatted_text = f"{hijri_date.day_name(language='ar')} {hijri_date.day} {hijri_date.month_name(language='ar')} {hijri_date.year}"
         return Translator.display_ar_text(text=unformatted_text)
 
-    # ----------------------------- window generators ----------------------------- #
+    # -------------------------- window generators -------------------------- #
 
     def generate_location_window(self):
         """method to generate the location window layout based on the app language
@@ -224,8 +193,8 @@ class Athany:
         current_athan = "Custom" if self.settings["-use-custom-athan-"] \
             else self.settings["-athan-sound-"][:-4].replace("_", " ")
 
-        method = self.calculation_methods.get(
-            self.settings["-used-method-"], self.calculation_methods[4])[1]
+        method = self.pt.calculation_methods.get(
+            self.settings["-used-method-"], self.pt.calculation_methods[4])[1]
 
         # tab 1 contains application settings
         app_settings_tab = self.translator.adjust_layout_direction([
@@ -357,7 +326,7 @@ class Athany:
                 sg.Push(),
                 sg.Combo(default_value=method, readonly=True, s=37,
                          values=[x[1]
-                                 for x in self.calculation_methods.values()],
+                                 for x in self.pt.calculation_methods.values()],
                          key="-DROPDOWN-METHODS-", enable_events=True, pad=(5, 10), font="Helvetica 10")
             ],
             [
@@ -378,7 +347,7 @@ class Athany:
                                "Default method"),
                 sg.Push(),
                 TranslatedText(self.translator,
-                               self.calculation_methods[self.settings["-default-method-"]][1]),
+                               self.pt.calculation_methods[self.settings["-default-method-"]][1]),
             ]
         ])
 
@@ -427,7 +396,7 @@ class Athany:
         else:
             return False
 
-    # --------------------------- athan-related methods --------------------------- #
+    # ------------------------ athan-related methods ------------------------ #
 
     def download_athan(self, athan_filename: str) -> bool:
         """Function to download athans from app bucket
@@ -496,13 +465,7 @@ class Athany:
         mixer.music.play()
         return True
 
-    # ---------------------------- calculation methods ---------------------------- #
-
-    def update_time(self):
-        """method to update the 'now' attribute of the application according to the local time
-        """
-        self.now = datetime.datetime.now(
-            tz=ZoneInfo(self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
+    # --------------------------- helper methods ---------------------------- #
 
     def fetch_calculation_data(self, cit: str, count: str) -> dict:
         """check if location data (coords, timezone) for city+country exists and fetch it if not
@@ -535,17 +498,10 @@ class Athany:
         """sets the prayer times window layout and
         the inital upcoming prayers on application startup
         """
-        self.now = datetime.datetime.now(
-            tz=ZoneInfo(self.settings["-location-"]["-timezone-"]))
-        self.tomorrow = self.now+datetime.timedelta(days=1)
-
-        coords = self.settings["-location-"]["-coordinates-"]
-
-        self.current_furood = self.get_prayers_dict(coords, self.now)
-
+        self.pt = ModifiedPrayerTimes(self, datetime.datetime.now())
         # Prayer times change after Isha athan to the times of the following day
-        # this sets the current_fard & upcoming prayer times
-        self.update_current_and_next_prayer()
+        # this sets the current_fard & upcoming_prayer times
+        self.pt.update_current_and_next_prayer()
 
         print(" DEBUG ".center(50, "="))
 
@@ -570,7 +526,7 @@ class Athany:
             ]
         ]
 
-        for prayer, time in self.current_furood.items():  # append upcoming prayers to list
+        for prayer, time in self.pt.current_furood.items():
             # setting the main window layout with the inital prayer times
             self.init_layout.append(
                 [
@@ -605,82 +561,6 @@ class Athany:
 
         print("="*50)
 
-    def get_prayers_dict(self, coordinates, date: datetime.datetime) -> dict:
-        """method to get given date prayer times dictionary
-        :param coordinates: (tuple[int,int]) a tuple containing the lat & long coordinates
-        :param date: (datetime.datetime) the date to get the prayer times for
-        :return: (dict) dictionary of prayer name-prayer datetime pairs
-        """
-        if self.settings["-used-method-"] == 99:
-            params = self.calculation_methods[99][0]
-            params.method = None
-            params.fajr_angle = self.settings["-custom-angles-"][0]
-            params.isha_angle = self.settings["-custom-angles-"][1]
-        else:
-            method = self.calculation_methods[self.settings["-used-method-"]][0]
-            params = CalculationParameters(method,
-                                           adjustments=self.prayer_offsets)
-
-        pt_object = PrayerTimes(coordinates, date,
-                                calculation_parameters=params,
-                                time_zone=ZoneInfo(self.settings["-location-"]["-timezone-"]))
-
-        return {name: getattr(pt_object, name.lower()) for name in self.displayed_times}
-
-    def update_current_and_next_prayer(self):
-        """function to set the current & next fard from the furood dict & update the dict used if Isha passed
-        :return: (bool) whether Isha passed (i.e current furood times were changed) or no,
-        in order for the main window to update the prayer times displayed
-        """
-        isha_passed = False
-        self.tomorrow = self.now+datetime.timedelta(days=1)
-
-        # If isha is the current fard, update the furood dict to set the fajr of tomorrow
-        if self.now >= self.current_furood["Isha"]:
-            self.current_fard = ("Isha", self.current_furood["Isha"])
-            self.current_furood = self.get_prayers_dict(
-                self.settings["-location-"]["-coordinates-"], self.tomorrow)
-            self.upcoming_prayer = ("Fajr", self.current_furood["Fajr"])
-            isha_passed = True
-
-        elif self.now >= self.current_furood["Maghrib"]:
-            self.current_fard = ("Maghrib", self.current_furood["Maghrib"])
-            self.upcoming_prayer = ("Isha", self.current_furood["Isha"])
-
-        elif self.now >= self.current_furood["Asr"]:
-            self.current_fard = ("Asr", self.current_furood["Asr"])
-            self.upcoming_prayer = ("Maghrib", self.current_furood["Maghrib"])
-
-        elif self.now >= self.current_furood["Dhuhr"]:
-            self.current_fard = ("Dhuhr", self.current_furood["Dhuhr"])
-            self.upcoming_prayer = ("Asr", self.current_furood["Asr"])
-
-        elif self.now >= self.current_furood["Sunrise"]:
-            self.current_fard = ("Sunrise", self.current_furood["Sunrise"])
-            self.upcoming_prayer = ("Dhuhr", self.current_furood["Dhuhr"])
-
-        elif self.now >= self.current_furood["Fajr"]:
-            self.current_fard = ("Fajr", self.current_furood["Fajr"])
-            self.upcoming_prayer = ("Sunrise", self.current_furood["Sunrise"])
-
-        else:
-            self.current_fard = ("Isha", self.current_furood["Isha"])
-            self.upcoming_prayer = ("Fajr", self.current_furood["Fajr"])
-
-        return isha_passed
-
-    def get_method_id(self, method_name: str):
-        """method to set the id of the given calculation method name in the settings file
-
-        :param (str) method_name: name of the method to get the id for
-        :return (int): the id of the given method
-        """
-        for identifier, details in self.calculation_methods.items():
-            if method_name == details[1]:
-                return identifier
-
-    # ---------------------------------------- UI methods ---------------------------------------- #
-
     def choose_location_if_not_saved(self) -> dict:
         """function to get & set the user location
         :return: (dict) dictionary of the chosen location json data
@@ -711,7 +591,6 @@ class Athany:
                                  enable_close_attempted_event=True,
                                  finalize=True)
 
-        self.window.disable_debugger()
         if self.translator.bidirectional:
             self.window["-RIGHT-DECORATION-"].update(
                 value=sg.SYMBOL_LEFT_ARROWHEAD)
@@ -725,8 +604,7 @@ class Athany:
 
         self.window.start_system_tray()
         self.window.highlight_current_fard_in_ui()
-
-        self.window.main_event_loop()
+        self.window.run_event_loop()
 
         # when the event loop ends, close the application
         self.close_app_windows()

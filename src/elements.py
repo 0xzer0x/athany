@@ -1,4 +1,4 @@
-"""Module that contains modified GUI elements"""
+"""Module that contains custom GUI elements used"""
 import os
 from pygame import mixer
 import PySimpleGUI as sg
@@ -8,7 +8,6 @@ from adhanpy.calculation.MethodsParameters import methods_parameters
 DATA_DIR = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), "Data")
 ATHANS_DIR = os.path.join(DATA_DIR, "Athans")
-TRANSLATIONS_DIR = os.path.join(DATA_DIR, "Translations")
 
 with open(os.path.join(DATA_DIR, "app_icon.dat"), mode="rb") as icon:
     APP_ICON = icon.read()
@@ -52,20 +51,14 @@ class MainWindow(sg.Window):
         self.sys_tray = None
         self.parent = parent
         super().__init__(**kwargs)
-
-    def check_if_prayer_time_came(self):
-        """method to check whether next prayer time came & notify the user if that's the case
-
-        :return bool: whether the upcoming prayer time came or not
-        """
-        return self.parent.now >= self.parent.upcoming_prayer[1]
+        self.disable_debugger()
 
     def show_notification_and_athan(self):
         """method to send notification to the user and play athan sound when prayer time comes
         """
-        if self.parent.current_fard[0] != "Sunrise":
+        if self.parent.pt.current_fard[0] != "Sunrise":
             self.sys_tray.show_message(
-                title="Athany 🕌", message=self.parent.translator.translate(f"It's time for {self.parent.current_fard[0]} prayer"))
+                title="Athany 🕌", message=self.parent.translator.translate(f"It's time for {self.parent.pt.current_fard[0]} prayer"))
 
             # play athan sound from user athan sound settings (if athan sound not muted)
             if not self.parent.settings["-mute-athan-"]:
@@ -84,15 +77,15 @@ class MainWindow(sg.Window):
             self[f"-{name.upper()}-TIME-"].update(font=self.parent.GUI_FONT,
                                                   text_color=sg.theme_text_color())
 
-        if self.parent.current_fard[0] == "Sunrise":
+        if self.parent.pt.current_fard[0] == "Sunrise":
             self["-FAJR-"].update(
                 font=(self.parent.GUI_FONT[0], self.parent.GUI_FONT[1], "italic"), text_color='#cd8032')
             self["-FAJR-TIME-"].update(
                 font=(self.parent.GUI_FONT[0], self.parent.GUI_FONT[1], "italic"), text_color='#cd8032')
         else:
-            self[f"-{self.parent.current_fard[0].upper()}-"].update(
+            self[f"-{self.parent.pt.current_fard[0].upper()}-"].update(
                 font=(self.parent.GUI_FONT[0], self.parent.GUI_FONT[1], "italic"), text_color='#cd8032')
-            self[f"-{self.parent.current_fard[0].upper()}-TIME-"].update(
+            self[f"-{self.parent.pt.current_fard[0].upper()}-TIME-"].update(
                 font=(self.parent.GUI_FONT[0], self.parent.GUI_FONT[1], "italic"), text_color='#cd8032')
 
     def refresh_prayers_in_ui(self, prayer_times_changed: bool):
@@ -107,46 +100,46 @@ class MainWindow(sg.Window):
         # If current_furood dict was changed,
         # then update the ui with the next day prayers starting from Fajr
         if prayer_times_changed:
-            for prayer, time in self.parent.current_furood.items():
+            for prayer, time in self.parent.pt.current_furood.items():
                 self[f"-{prayer.upper()}-TIME-"].update(
                     value=time.strftime("%I:%M %p"))
 
     # ---------------------------- event handlers ---------------------------- #
 
-    def main_event_loop(self):
+    def run_event_loop(self, timeout=100):
         """main window event handling loop
         """
         win2_active = False
         while True:
-            self.parent.update_time()
+            self.parent.pt.update_time()
 
-            if self.check_if_prayer_time_came():
-                pt_changed = self.parent.update_current_and_next_prayer()
+            if self.parent.pt.prayer_time_came():
+                pt_changed = self.parent.pt.update_current_and_next_prayer()
                 self.show_notification_and_athan()
                 self.refresh_prayers_in_ui(pt_changed)
 
             # get remaining time till next prayer
-            time_d = self.parent.upcoming_prayer[1] - self.parent.now
+            time_d = self.parent.pt.upcoming_fard[1] - self.parent.pt.now
 
             # update the main window with the next prayer and remaining time
             self["-NEXT-PRAYER-"].update(
-                value=self.parent.upcoming_prayer[0])
+                value=self.parent.pt.upcoming_fard[0])
             self["-TIME-D-"].update(value=str(time_d))
 
             # update the current dates
             self["-CURRENT-TIME-"].update(
-                value=self.parent.now.strftime("%I:%M %p"))
+                value=self.parent.pt.now.strftime("%I:%M %p"))
             self["-TODAY-"].update(
-                value=self.parent.now.strftime("%a %d %b %y"))
+                value=self.parent.pt.now.strftime("%a %d %b %y"))
             self["-TODAY_HIJRI-"].update(
-                value=self.parent.get_hijri_date(self.parent.now))
+                value=self.parent.get_hijri_date())
 
             # update system tray tooltip also
             self.sys_tray.set_tooltip(
-                f"{self.parent.upcoming_prayer[0]} in {time_d}")
+                f"{self.parent.pt.upcoming_fard[0]} in {time_d}")
 
             # main event reading
-            event1, values1 = self.read(timeout=100)
+            event1, values1 = self.read(timeout=timeout)
 
             if event1 == self.sys_tray.key:
                 event1 = values1[event1]
@@ -154,12 +147,15 @@ class MainWindow(sg.Window):
                 print("[DEBUG] SystemTray event:", event1)
 
             # Event check and preform action
-            if event1 in (sg.WIN_CLOSED, "-EXIT-", "Exit"):
+            if event1 == sg.TIMEOUT_KEY:
+                pass
+
+            elif event1 in (sg.WIN_CLOSED, "-EXIT-", "Exit"):
                 self.sys_tray.close()
                 del self.sys_tray
                 break
 
-            if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
+            elif event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
                 self.hide()
                 self.sys_tray.show_icon()
                 self.sys_tray.show_message(title="Athany minimized to system tray",
@@ -176,17 +172,17 @@ class MainWindow(sg.Window):
             # open up the settings window and read values from it along with the main window
             elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
                 win2_active = True
-                settings_window = self.parent.generate_settings_window()
+                settings_window: SettingsWindow = self.parent.generate_settings_window()
 
             # If 2nd window (settings window) is open, run the settings window event handling method
             if win2_active:
-                win2_active = settings_window.handle_event_loop()
+                win2_active = settings_window.run_event_loop()
             else:
                 settings_window = None
 
     # ---------------------- startup & shutdown methods ---------------------- #
 
-    def start_system_tray(self) -> SystemTray:
+    def start_system_tray(self):
         """starts the SystemTray object and instantiates it"s menu and tooltip
         """
         menu = ["", ["Show Window", "Hide Window", "---", "Stop athan",
@@ -205,7 +201,7 @@ class SettingsWindow(sg.Window):
         self.parent = parent
         super().__init__(**kwargs)
 
-    def handle_event_loop(self, timeout=100):
+    def run_event_loop(self, timeout=100):
         """method for handling events that come from the settings window
 
         :param int timeout: the timeout for the read method
@@ -215,7 +211,10 @@ class SettingsWindow(sg.Window):
         event2, values2 = self.read(timeout=timeout)
         self.disable_debugger()
 
-        if event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
+        if event2 == sg.TIMEOUT_KEY:
+            pass
+
+        elif event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
             win_active = False
             offset_changed = False
             action_type = values2.get("-DONE-", None)
@@ -223,7 +222,7 @@ class SettingsWindow(sg.Window):
             self.parent.save_loc_check = self["-TOGGLE-SAVE-LOCATION-"].metadata
             self.parent.settings["-custom-athan-"] = self["-CUSTOM-ATHAN-NAME-"].get()
 
-            for prayer in self.parent.current_furood:
+            for prayer in self.parent.pt.current_furood:
                 pt_offset = self[f"-{prayer.upper()}-OFFSET-"].get()
                 if self.parent.settings["-offset-"][f"-{prayer}-"] != pt_offset:
                     self.parent.settings["-offset-"][f"-{prayer}-"] = pt_offset
@@ -332,7 +331,7 @@ class SettingsWindow(sg.Window):
                         value="Current athan")
                     self["-DROPDOWN-ATHANS-"].update(
                         value=self.parent.settings["-athan-sound-"][:-4].replace("_", " "))
-                    self.parent.application_tray.show_message(
+                    self.parent.window.sys_tray.show_message(
                         title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
 
                 self["-DONE-"].update(disabled=False)
@@ -343,7 +342,7 @@ class SettingsWindow(sg.Window):
                   self.parent.settings["-athan-sound-"])
 
         elif event2 == "-DROPDOWN-METHODS-":
-            self.parent.settings["-used-method-"] = self.parent.get_method_id(
+            self.parent.settings["-used-method-"] = self.parent.pt.get_method_id(
                 values2["-DROPDOWN-METHODS-"])
 
             if self.parent.settings["-used-method-"] == 99:
@@ -355,16 +354,15 @@ class SettingsWindow(sg.Window):
             else:
                 self["-SET-CUSTOM-ANGLES-"].update(disabled=True)
                 used_method = methods_parameters[
-                    self.parent.calculation_methods[self.parent.settings["-used-method-"]][0]]
+                    self.parent.pt.calculation_methods[self.parent.settings["-used-method-"]][0]]
                 self["-FAJR-ANGLE-IN-"].update(
                     value=used_method["fajr_angle"], disabled=True, text_color="grey")
                 self["-ISHA-ANGLE-IN-"].update(
                     value=used_method.get("isha_angle", "not used"), disabled=True, text_color="grey")
 
-            self.parent.current_furood = self.parent.get_prayers_dict(
-                self.parent.settings["-location-"]["-coordinates-"], self.parent.now)
-            self.parent.update_current_and_next_prayer()
-            self.parent.refresh_prayers_in_ui(True)
+            self.parent.pt.update_current_furood(self.parent.pt.now)
+            self.parent.pt.update_current_and_next_prayer()
+            self.parent.window.refresh_prayers_in_ui(True)
 
         elif event2 == "-SET-CUSTOM-ANGLES-":
             try:
@@ -374,10 +372,9 @@ class SettingsWindow(sg.Window):
                     raise TypeError
 
                 self.parent.settings["-custom-angles-"] = [fajr, isha]
-                self.parent.current_furood = self.parent.get_prayers_dict(
-                    self.parent.settings["-location-"]["-coordinates-"], self.parent.now)
-                self.parent.update_current_and_next_prayer()
-                self.parent.refresh_prayers_in_ui(True)
+                self.parent.pt.update_current_furood(self.parent.pt.now)
+                self.parent.pt.update_current_and_next_prayer()
+                self.parent.window.refresh_prayers_in_ui(True)
 
                 self["-FAJR-ANGLE-IN-"].update(
                     background_color=sg.theme_input_background_color())
@@ -488,8 +485,8 @@ class ChooseLocationWindow(sg.Window):
                     )
                     self.parent.settings["-location-"]["-timezone-"] = location_data["timezone"]
                     self.parent.settings.save()
-                    self.parent.settings["-default-method-"] = location_data["method"][
-                        "id"] if location_data["method"]["id"] in self.parent.calculation_methods else 4
+                    self.parent.settings["-default-method-"] = \
+                        location_data["method"]["id"] if location_data["method"]["id"] in self.parent.pt.calculation_methods else 4
                     self.parent.settings["-used-method-"] = self.parent.settings["-default-method-"]
 
                     self.parent.save_loc_check = values["-SAVE-LOC-CHECK-"]
