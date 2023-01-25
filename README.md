@@ -3,7 +3,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/0xzer0x/athany-app">
+  <a href="https://github.com/0xzer0x/athany">
     <img src="images/athany_icon.ico" alt="Logo" width="80" height="80">
   </a>
 
@@ -13,14 +13,14 @@
     a python application to remind you of your purpose
     <br />
     <br />
-    <a href="https://github.com/0xzer0x/athany-app/releases/latest"><img src="https://img.shields.io/github/v/release/0xzer0x/athany-app"></a>
-    <a href="https://www.codefactor.io/repository/github/0xzer0x/athany-app/overview/master"><img src="https://www.codefactor.io/repository/github/0xzer0x/athany-app/badge/master" alt="CodeFactor" /></a>
+    <a href="https://github.com/0xzer0x/athany/releases/latest"><img src="https://img.shields.io/github/v/release/0xzer0x/athany"></a>
+    <a href="https://www.codefactor.io/repository/github/0xzer0x/athany/overview/master"><img src="https://www.codefactor.io/repository/github/0xzer0x/athany/badge/master" alt="CodeFactor" /></a>
     <br />
-    <a href="https://github.com/0xzer0x/athany-app#usage">View Demo</a>
+    <a href="https://github.com/0xzer0x/athany#usage">View Demo</a>
     ·
-    <a href="https://github.com/0xzer0x/athany-app/issues">Report Bug</a>
+    <a href="https://github.com/0xzer0x/athany/issues">Report Bug</a>
     ·
-    <a href="https://github.com/0xzer0x/athany-app/issues">Request Feature</a>
+    <a href="https://github.com/0xzer0x/athany/issues">Request Feature</a>
   </p>
 </div>
 
@@ -97,13 +97,13 @@ Install the [latest stable version][latest-release] using the windows setup prov
 2. Clone the repo
 
    ```sh
-   git clone https://github.com/0xzer0x/athany-app.git
+   git clone https://github.com/0xzer0x/athany.git
    ```
 
 3. Install python packages
 
    ```sh
-   cd athany-app
+   cd athany
    pip install -r requirements.txt
    ```
 
@@ -151,7 +151,7 @@ the custom athan tab allows you to choose a local audio file (.wav, .mp3) to pla
 
 the offset tab allows you to adjust prayer times by adding/subtracting minutes from the default calculated time
 
-[check out other screenshots](https://github.com/0xzer0x/athany-app/tree/master/images)
+[check out other screenshots](https://github.com/0xzer0x/athany/tree/master/images)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -165,7 +165,7 @@ the offset tab allows you to adjust prayer times by adding/subtracting minutes f
 - [ ] Add translations
 - [ ] make an Android version using `kivy` library
 
-See the [open issues](https://github.com/0xzer0x/athany-app/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/0xzer0x/athany/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -194,7 +194,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 Fursan team - y.essam2256@nu.edu.eg
 
-Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x/athany-app)
+Project Link: [https://github.com/0xzer0x/athany](https://github.com/0xzer0x/athany)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -213,7 +213,7 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 
 <!-- MARKDOWN LINKS & IMAGES -->
 
-[latest-release]: https://github.com/0xzer0x/athany-app/releases/latest
+[latest-release]: https://github.com/0xzer0x/athany/releases/latest
 [python]: https://img.shields.io/badge/Python-yellowgreen?style=for-the-badge&logo=Python&logoColor=white
 [psg]: https://img.shields.io/badge/PySimpleGUI-blue?style=for-the-badge&logo=Python&logoColor=white
 [python-url]: https://python.org
@@ -225,4 +225,4 @@ Project Link: [https://github.com/0xzer0x/athany-app](https://github.com/0xzer0x
 [settings-window-custom-athan-tab]: images/custom-athan-120-en.png
 [settings-window-offset-tab]: images/offset-tab-120-en.png
 [gnome-appindicator-ext]: https://extensions.gnome.org/extension/615/appindicator-support/
-[fonts-download-url]: https://github.com/0xzer0x/athany-app/releases/download/1.0.0-stable/fonts.zip
+[fonts-download-url]: https://github.com/0xzer0x/athany/releases/download/1.0.0-stable/fonts.zip
