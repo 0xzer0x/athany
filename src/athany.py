@@ -6,13 +6,10 @@ from zoneinfo import ZoneInfo
 
 import requests
 import hijri_converter
-import PySimpleGUI as sg
-from pygame import mixer
-from psgtray import SystemTray
-from adhanpy.PrayerTimes import PrayerTimes
-from adhanpy.calculation import CalculationMethod
-from adhanpy.calculation import CalculationParameters
-from adhanpy.calculation.PrayerAdjustments import PrayerAdjustments
+from src.elements import sg, mixer
+from src.elements import SettingsWindow, MainWindow, ChooseLocationWindow
+from src.elements import TranslatedText, TranslatedButton
+from src.modifiedpt import ModifiedPrayerTimes
 from src.translator import Translator
 if sys.platform == "win32":
     # library for system notifications on Windows
@@ -41,7 +38,7 @@ with open(os.path.join(DATA_DIR, "available_athans.txt"), encoding="utf-8") as f
 
 class Athany:
     """Python application to fetch prayer times, display them in a GUI and play adhan"""
-    # ------------------------------------- Application Settings --------------------------------- #
+    # ------------------------- default app settings ------------------------- #
 
     def __init__(self) -> None:
         self.settings = sg.UserSettings(
@@ -58,6 +55,8 @@ class Athany:
             self.settings["-offset-"] = {"-Fajr-": 0, "-Sunrise-": 0,
                                          "-Dhuhr-": 0, "-Asr-": 0,
                                          "-Maghrib-": 0, "-Isha-": 0}
+        if not self.settings["-custom-angles-"]:
+            self.settings["-custom-angles-"] = [18, 18]
 
         if not self.settings["-mute-athan-"]:
             self.settings["-mute-athan-"] = False
@@ -69,68 +68,46 @@ class Athany:
                 self.settings["-athan-sound-"] not in os.listdir(ATHANS_DIR):
             self.settings["-athan-sound-"] = "Abdul-Basit_(Takbeer_only).mp3"
 
-        self.now = datetime.datetime.now()
-        self.tomorrow = self.now+datetime.timedelta(days=1)
-        self.translator = Translator(self.settings["-lang-"], TRANSLATIONS_DIR)
-        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13",
-                                 "DarkBlue17", "DarkBrown", "DarkBrown2",
-                                 "DarkBrown7", "DarkGreen7", "DarkGrey2",
-                                 "DarkGrey5", "DarkGrey8", "DarkGrey10",
-                                 "DarkGrey11", "DarkGrey13", "DarkPurple7",
-                                 "DarkTeal10", "DarkTeal11"]
-        self.api_endpoint = " http://api.aladhan.com/v1/timingsByCity"
-        self.displayed_times = ["Fajr", "Sunrise",
-                                "Dhuhr", "Asr", "Maghrib", "Isha"]
-        self.calculation_methods = {
-            1: CalculationMethod.KARACHI,
-            2: CalculationMethod.NORTH_AMERICA,
-            3: CalculationMethod.MUSLIM_WORLD_LEAGUE,
-            4: CalculationMethod.UMM_AL_QURA,
-            5: CalculationMethod.EGYPTIAN,
-            9: CalculationMethod.KUWAIT,
-            10: CalculationMethod.QATAR,
-            11: CalculationMethod.SINGAPORE,
-            12: CalculationMethod.UOIF,
-            15: CalculationMethod.MOON_SIGHTING_COMMITTEE,
-        }
-        self.prayer_offsets = PrayerAdjustments(
-            self.settings["-offset-"]["-Fajr-"],
-            self.settings["-offset-"]["-Sunrise-"],
-            self.settings["-offset-"]["-Dhuhr-"],
-            self.settings["-offset-"]["-Asr-"],
-            self.settings["-offset-"]["-Maghrib-"],
-            self.settings["-offset-"]["-Isha-"]
-        )
-
         if sys.platform == "win32":
             self.GUI_FONT = ("Readex Pro", 11)
             self.HIJRI_DATE_FONT = ("Arabic Typesetting", 20)
         else:
             self.GUI_FONT = ("Droid Sans Arabic", 11)
             self.HIJRI_DATE_FONT = (self.GUI_FONT[0], 12)
-        if self.translator.lang == 'ar':
+        if self.settings["-lang-"] == 'ar':
             self.BUTTON_FONT = (self.GUI_FONT[0], 8)
             self.MONO_FONT = (self.GUI_FONT[0], 9)
+            self.settings_button_width = 10
         else:
             self.MONO_FONT = ("IBM Plex Mono", 10)
             self.BUTTON_FONT = ("Helvetica", 9)
+            self.settings_button_width = 6
 
-        sg.theme(self.settings["-theme-"])
-        sg.set_global_icon(APP_ICON)
-        self.chosen_theme = None
         self.location_api = None
         self.restart_app, self.save_loc_check = False, False
-        self.settings_button_width = 10 if self.translator.lang == 'ar' else 6
+        self.translator = Translator(self.settings["-lang-"], TRANSLATIONS_DIR)
+        self.api_endpoint = " http://api.aladhan.com/v1/timingsByCity"
+        self.displayed_times = ["Fajr", "Sunrise",
+                                "Dhuhr", "Asr", "Maghrib", "Isha"]
 
+        self.chosen_theme = None
+        sg.set_global_icon(APP_ICON)
+        sg.theme(self.settings["-theme-"])
+        self.available_themes = ["DarkAmber", "DarkBlack1", "DarkBlue13",
+                                 "DarkBlue17", "DarkBrown", "DarkBrown2",
+                                 "DarkBrown7", "DarkGreen7", "DarkGrey2",
+                                 "DarkGrey5", "DarkGrey8", "DarkGrey10",
+                                 "DarkGrey11", "DarkGrey13", "DarkPurple7",
+                                 "DarkTeal10", "DarkTeal11"]
+
+        self.pt = None
         self.init_layout = None
-        self.current_furood = None
-        self.current_fard, self.upcoming_prayer = None, None
-        self.window, self.application_tray = None, None
+        self.window = None
 
         # self.calculation_data will either be a dict (api json response) or None
         self.calculation_data = self.choose_location_if_not_saved()
 
-    # ------------------------------------- main application logic ------------------------------- #
+    # ---------------------------- static methods ---------------------------- #
 
     @staticmethod
     def get_current_location() -> tuple[str, str]:
@@ -161,18 +138,15 @@ class Athany:
         return ret_val
 
     @staticmethod
-    def get_hijri_date(date: datetime.datetime) -> str:
+    def get_hijri_date() -> str:
         """function to return arabic hijri date string to display in main window
-        :param date: (datetime.datetime) date to get hijri date for
         :return: (str) Arabic string of current Hijri date
         """
-        hijri_date = hijri_converter.Gregorian(date.year,
-                                               date.month,
-                                               date.day).to_hijri()
+        hijri_date = hijri_converter.Gregorian.today().to_hijri()
         unformatted_text = f"{hijri_date.day_name(language='ar')} {hijri_date.day} {hijri_date.month_name(language='ar')} {hijri_date.year}"
         return Translator.display_ar_text(text=unformatted_text)
 
-    # ----------------------------- window generators ----------------------------- #
+    # -------------------------- window generators -------------------------- #
 
     def generate_location_window(self):
         """method to generate the location window layout based on the app language
@@ -181,59 +155,63 @@ class Athany:
         """
         layout = self.translator.adjust_layout_direction([
             [
-                sg.Text(self.translator.translate("Set your location"),
-                        key="-LOC-TXT-", pad=(0, 5)),
+                TranslatedText(self.translator, "Set your location",
+                               key="-LOC-TXT-", pad=(0, 5)),
                 sg.Text(key="-LOCATION-NAME-", pad=(0, 5)),
                 sg.Push()
             ],
             [
-                sg.Text(self.translator.translate("City")),
+                TranslatedText(self.translator, "City"),
                 sg.Input(size=(15, 1), key="-CITY-", focus=True),
-                sg.Text((self.translator.translate("Country"))),
+                TranslatedText(self.translator, "Country"),
                 sg.Input(size=(15, 1), key="-COUNTRY-"),
                 sg.Push(),
                 sg.Checkbox(self.translator.translate(
                     "Save location"), key="-SAVE-LOC-CHECK-")
             ],
             [
-                sg.Button(self.translator.translate("Ok"), size=(10, 1), key="-OK-",
-                          font=self.BUTTON_FONT, bind_return_key=True),
-                sg.Button(self.translator.translate("Use current location"),
-                          key="-USE-CURRENT-LOCATION-", font=self.BUTTON_FONT),
+                TranslatedButton(self.translator, "Ok", size=(10, 1), key="-OK-",
+                                 font=self.BUTTON_FONT, bind_return_key=True),
+                TranslatedButton(self.translator, "Use current location",
+                                 key="-USE-CURRENT-LOCATION-", font=self.BUTTON_FONT),
                 sg.Text(key="-AUTO-LOCATION-"),
                 sg.Push(),
-                sg.Button(self.translator.translate("Cancel"), size=(10, 1),
-                          key="-CANCEL-", font=self.BUTTON_FONT)
+                TranslatedButton(self.translator, "Cancel", size=(10, 1),
+                                 key="-CANCEL-", font=self.BUTTON_FONT)
             ]
         ])
 
-        return sg.Window("Athany - set location",
-                         layout,
-                         font=self.GUI_FONT)
+        return ChooseLocationWindow(self,
+                                    title="Athany - set location",
+                                    layout=layout,
+                                    font=self.GUI_FONT)
 
     def generate_settings_window(self):
         """method to generate the settings window layout based on app language
 
-        :return PySimpleGUI.Window: settings window object
+        :return SettingsWindow: settings window object
         """
         current_athan = "Custom" if self.settings["-use-custom-athan-"] \
             else self.settings["-athan-sound-"][:-4].replace("_", " ")
+
+        method = self.pt.calculation_methods.get(
+            self.settings["-used-method-"], self.pt.calculation_methods[4])[1]
 
         # tab 1 contains application settings
         app_settings_tab = self.translator.adjust_layout_direction([
             [
                 sg.Col(
                     self.translator.adjust_layout_direction([[
-                        sg.Text(self.translator.translate(
-                            "Mute athan"), pad=0),
+                        TranslatedText(self.translator,
+                                       "Mute athan", pad=0),
                         sg.Push(),
                         sg.Button(image_data=TOGGLE_ON_B64 if self.settings["-mute-athan-"] else TOGGLE_OFF_B64,
                                   key="-TOGGLE-MUTE-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
                                   border_width=0, metadata=self.settings["-mute-athan-"])
                     ],
                         [
-                        sg.Text(self.translator.translate(
-                            "Save location"), pad=0),
+                        TranslatedText(self.translator,
+                                       "Save location", pad=0),
                         sg.Text(
                             f"({self.settings['-location-']['-city-']}, {self.settings['-location-']['-country-']})", pad=0),
                         sg.Push(),
@@ -242,17 +220,18 @@ class Athany:
                                   border_width=0, pad=(5, 0), metadata=self.save_loc_check)
                     ]])
                 ),
+                sg.Push(),
                 sg.Col(
                     self.translator.adjust_layout_direction([[
-                        sg.Text(self.translator.translate("Language")),
+                        TranslatedText(self.translator, "Language"),
                         sg.Push(),
                         sg.Combo(enable_events=True, values=["ar", "en"], key="-DROPDOWN-LANG-",
                                  readonly=True, default_value=self.settings["-lang-"], font="Helvetica 9")
                     ],
 
                         [
-                        sg.Text(self.translator.translate(
-                            "Current theme"), pad=(5, (10, 0))),
+                        TranslatedText(self.translator,
+                                       "Current theme", pad=(5, (10, 0))),
                         sg.Push(),
                         sg.Combo(enable_events=True, values=self.available_themes, key="-DROPDOWN-THEMES-",
                                  readonly=True, default_value=self.settings["-theme-"], font="Helvetica 9", pad=(5, (10, 0)))
@@ -260,8 +239,8 @@ class Athany:
                 )
             ],
             [
-                sg.Text(self.translator.translate("Current athan"), pad=(5, 5),
-                        key="-DISPLAYED-MSG-"),
+                TranslatedText(self.translator, "Current athan", pad=(5, 5),
+                               key="-DISPLAYED-MSG-"),
                 sg.Push(),
                 sg.Combo(disabled=self.settings["-use-custom-athan-"], enable_events=True,
                          values=AVAILABLE_ATHANS, key="-DROPDOWN-ATHANS-",
@@ -275,53 +254,50 @@ class Athany:
             [
                 sg.Col(
                     self.translator.adjust_layout_direction([
-                        [sg.Text(self.translator.translate("Fajr offset")),
+                        [TranslatedText(self.translator, "Fajr offset"),
                          sg.Push(), sg.Spin(
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Fajr-"],
                          key="-FAJR-OFFSET-", readonly=True, text_color="black")
                          ],
-                        [sg.Text(self.translator.translate("Sunrise offset")),
+                        [TranslatedText(self.translator, "Sunrise offset"),
                          sg.Push(), sg.Spin(
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Sunrise-"],
                          key="-SUNRISE-OFFSET-", readonly=True, text_color="black")
                          ],
-                        [sg.Text(self.translator.translate("Dhuhr offset")),
+                        [TranslatedText(self.translator, "Dhuhr offset"),
                          sg.Push(), sg.Spin(
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Dhuhr-"],
                          key="-DHUHR-OFFSET-", readonly=True, text_color="black")
                          ]
-                    ])
-
-                ),
+                    ]), pad=((5, 5), (10, 5))),
                 sg.Push(),
                 sg.Col(
                     self.translator.adjust_layout_direction([
-                        [sg.Text(self.translator.translate("Asr offset")),
+                        [TranslatedText(self.translator, "Asr offset"),
                          sg.Push(), sg.Spin(
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Asr-"],
                          key="-ASR-OFFSET-", readonly=True, text_color="black")
                          ],
-                        [sg.Text(self.translator.translate("Maghrib offset")),
+                        [TranslatedText(self.translator, "Maghrib offset"),
                          sg.Push(), sg.Spin(
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Maghrib-"],
                          key="-MAGHRIB-OFFSET-", readonly=True, text_color="black")
                          ],
-                        [sg.Text(self.translator.translate("Isha offset")),
+                        [TranslatedText(self.translator, "Isha offset"),
                          sg.Push(), sg.Spin(
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Isha-"],
                          key="-ISHA-OFFSET-", readonly=True, text_color="black")
                          ]
                     ]
-                    )
-                )
+                    ), pad=((5, 5), (10, 5)))
             ]
         ])
 
         # tab 3 containing custom athan settings
         custom_athan_tab = self.translator.adjust_layout_direction([
             [
-                sg.Text(self.translator.translate(
-                    "Use custom athan sound"), pad=5),
+                TranslatedText(self.translator,
+                               "Use custom athan sound", pad=5),
                 sg.Push(),
                 sg.Button(image_data=TOGGLE_ON_B64 if self.settings["-use-custom-athan-"] else TOGGLE_OFF_B64,
                           key="-TOGGLE-CUSTOM-ATHAN-", pad=(5, 0), button_color=(sg.theme_background_color(), sg.theme_background_color()),
@@ -343,6 +319,39 @@ class Athany:
 
         ])
 
+        # tab 4 is for advanced calculation settings
+        advanced_settings_tab = self.translator.adjust_layout_direction([
+            [
+                TranslatedText(self.translator,
+                               "Calculation method", pad=(5, 10)),
+                sg.Push(),
+                sg.Combo(default_value=method, readonly=True, s=37,
+                         values=[x[1]
+                                 for x in self.pt.calculation_methods.values()],
+                         key="-DROPDOWN-METHODS-", enable_events=True, pad=(5, 10), font="Helvetica 10")
+            ],
+            [
+                TranslatedText(self.translator, "Fajr angle"),
+                sg.Input(key="-FAJR-ANGLE-IN-", s=7, disabled=self.settings["-used-method-"] != 99,
+                         default_text=self.settings["-custom-angles-"][0], disabled_readonly_text_color="grey",
+                         disabled_readonly_background_color=sg.theme_background_color(), font="Helvetica 10"),
+                TranslatedText(self.translator, "Isha angle"),
+                sg.Input(key="-ISHA-ANGLE-IN-", s=7, disabled=self.settings["-used-method-"] != 99,
+                         default_text=self.settings["-custom-angles-"][1], disabled_readonly_text_color="grey",
+                         disabled_readonly_background_color=sg.theme_background_color(), font="Helvetica 10"),
+                sg.Push(),
+                TranslatedButton(self.translator, "Set custom angles",
+                                 key="-SET-CUSTOM-ANGLES-", font=self.BUTTON_FONT, disabled=self.settings["-used-method-"] != 99)
+            ],
+            [
+                TranslatedText(self.translator,
+                               "Default method"),
+                sg.Push(),
+                TranslatedText(self.translator,
+                               self.pt.calculation_methods[self.settings["-default-method-"]][1]),
+            ]
+        ])
+
         settings_layout = [
             [
                 sg.TabGroup([[
@@ -352,33 +361,35 @@ class Athany:
                                 "custom athan"), custom_athan_tab),
                             sg.Tab(self.translator.translate(
                                 "prayer times offset (min)"), prayer_offset_tab),
+                            sg.Tab(self.translator.translate(
+                                "advanced settings"), advanced_settings_tab)
                             ]])
             ],
             [
-                sg.Button(self.translator.translate("Restart"), key="-RESTART-",
-                          font=self.BUTTON_FONT, s=self.settings_button_width, pad=(5, 15)),
-                sg.Button(self.translator.translate("Exit"), key="-EXIT-",
-                          font=self.BUTTON_FONT,
-                          button_color=('black', '#651C32'),
-                          s=self.settings_button_width, pad=(5, 15)),
+                TranslatedButton(self.translator, "Restart", key="-RESTART-",
+                                 font=self.BUTTON_FONT, s=self.settings_button_width, pad=(5, 15)),
+                TranslatedButton(self.translator, "Exit", key="-EXIT-",
+                                 font=self.BUTTON_FONT,
+                                 button_color=('black', '#651C32'),
+                                 s=self.settings_button_width, pad=(5, 15)),
                 sg.Push(),
-                sg.Button(self.translator.translate("Done"), key="-DONE-",
-                          font=self.BUTTON_FONT, s=self.settings_button_width, pad=(5, 15))
+                TranslatedButton(self.translator, "Done", key="-DONE-",
+                                 font=self.BUTTON_FONT, s=self.settings_button_width, pad=(5, 15))
             ]
         ]
 
-        return sg.Window("Athany - settings",
-                         settings_layout,
-                         icon=SETTINGS_ICON,
-                         font=self.GUI_FONT,
-                         enable_close_attempted_event=True,
-                         keep_on_top=True)
+        return SettingsWindow(self, title="Athany - settings",
+                              layout=settings_layout,
+                              icon=SETTINGS_ICON,
+                              font=self.GUI_FONT,
+                              enable_close_attempted_event=True,
+                              keep_on_top=True)
 
-    def yes_or_no_popup(self, text="An error occurred, Do you want to restart the application?"):
+    def yes_or_no_popup(self, text="Do you want to restart the application?"):
         """function to display a popup window & prompt the user to try again"""
         ans, _ = sg.Window("Confirm",
-                           [[sg.T(self.translator.translate(text))],
-                            [sg.Push(), sg.Button(self.translator.translate("Yes"), key="Yes", s=7), sg.Button(self.translator.translate("No"), key="No", s=7)]],
+                           [[TranslatedText(self.translator, text)],
+                            [sg.Push(), TranslatedButton(self.translator, "Yes", key="Yes", s=7), TranslatedButton(self.translator, "No", key="No", s=7)]],
                            font=self.BUTTON_FONT,
                            keep_on_top=True, disable_close=True).read(close=True)
         if ans == "Yes":
@@ -386,7 +397,7 @@ class Athany:
         else:
             return False
 
-    # --------------------------- athan-related methods --------------------------- #
+    # ------------------------ athan-related methods ------------------------ #
 
     def download_athan(self, athan_filename: str) -> bool:
         """Function to download athans from app bucket
@@ -402,13 +413,12 @@ class Athany:
                 file_size = int(file_data.headers.get("content-length"))
 
                 progress_layout = self.translator.adjust_layout_direction([
-                    [sg.Text(
-                        self.translator.translate("Downloading"), pad=0),
+                    [TranslatedText(self.translator, "Downloading", pad=0),
                         sg.Text(f"{athan_filename} ({file_size//1024} KB)", pad=0)],
                     [sg.ProgressBar(max_value=file_size,
                                     size=(20, 10), expand_x=True, orientation="h", key="-PROGRESS-METER-")],
-                    [sg.Push(), sg.Button(
-                        self.translator.translate("Cancel"), key="-CANCEL-")]
+                    [sg.Push(),
+                     TranslatedButton(self.translator, "Cancel", key="-CANCEL-")]
                 ])
 
                 prog_win = sg.Window("Download athan", progress_layout,
@@ -456,7 +466,7 @@ class Athany:
         mixer.music.play()
         return True
 
-    # ---------------------------- calculation methods ---------------------------- #
+    # --------------------------- helper methods ---------------------------- #
 
     def fetch_calculation_data(self, cit: str, count: str) -> dict:
         """check if location data (coords, timezone) for city+country exists and fetch it if not
@@ -489,17 +499,10 @@ class Athany:
         """sets the prayer times window layout and
         the inital upcoming prayers on application startup
         """
-        self.now = datetime.datetime.now(
-            tz=ZoneInfo(self.settings["-location-"]["-timezone-"]))
-        self.tomorrow = self.now+datetime.timedelta(days=1)
-
-        coords = self.settings["-location-"]["-coordinates-"]
-
-        self.current_furood = self.get_prayers_dict(coords, self.now)
-
+        self.pt = ModifiedPrayerTimes(self)
         # Prayer times change after Isha athan to the times of the following day
-        # this sets the current_fard & upcoming prayer times
-        self.update_current_and_next_prayer()
+        # this sets the current_fard & upcoming_prayer times
+        self.pt.update_current_and_next_prayer()
 
         print(" DEBUG ".center(50, "="))
 
@@ -515,21 +518,21 @@ class Athany:
             [
                 sg.Text(key="-LEFT-DECORATION-"),
                 sg.HorizontalSeparator(),
-                sg.Text(key="-NEXT-PRAYER-",
-                        font=(self.GUI_FONT[0], self.GUI_FONT[1], "bold")),
-                sg.Text(self.translator.translate("in"), font=self.GUI_FONT),
+                TranslatedText(self.translator, key="-NEXT-PRAYER-",
+                               font=(self.GUI_FONT[0], self.GUI_FONT[1], "bold")),
+                TranslatedText(self.translator, "in", font=self.GUI_FONT),
                 sg.Text(font=self.GUI_FONT, key="-TIME-D-"),
                 sg.HorizontalSeparator(),
                 sg.Text(key="-RIGHT-DECORATION-")
             ]
         ]
 
-        for prayer, time in self.current_furood.items():  # append upcoming prayers to list
+        for prayer, time in self.pt.current_furood.items():
             # setting the main window layout with the inital prayer times
             self.init_layout.append(
                 [
-                    sg.Text(self.translator.translate(prayer), key=f"-{prayer.upper()}-",
-                            font=self.GUI_FONT),
+                    TranslatedText(self.translator, prayer,
+                                   key=f"-{prayer.upper()}-", font=self.GUI_FONT),
                     sg.Push(),
                     sg.Text(time.strftime('%I:%M %p'), key=f"-{prayer.upper()}-TIME-",
                             font=self.GUI_FONT)
@@ -542,13 +545,13 @@ class Athany:
         self.init_layout += [
             [sg.HorizontalSeparator(color="black")],
             [
-                sg.Button(self.translator.translate("Settings"), key="-SETTINGS-",
-                          font=self.BUTTON_FONT),
-                sg.Button(self.translator.translate("Stop athan"), key="-STOP-ATHAN-",
-                          font=self.BUTTON_FONT),
+                TranslatedButton(self.translator, "Settings", key="-SETTINGS-",
+                                 font=self.BUTTON_FONT),
+                TranslatedButton(self.translator, "Stop athan", key="-STOP-ATHAN-",
+                                 font=self.BUTTON_FONT),
                 sg.Push(),
-                sg.Text(self.translator.translate(
-                    "current time"), font=self.MONO_FONT),
+                TranslatedText(self.translator, "current time",
+                               font=self.MONO_FONT),
                 sg.Text("~", font=("IBM Plex Mono", 10)),
                 sg.Text(key="-CURRENT-TIME-", font=("IBM Plex Mono", 10))
             ]
@@ -559,68 +562,6 @@ class Athany:
 
         print("="*50)
 
-    def get_prayers_dict(self, coordinates, date: datetime.datetime) -> dict:
-        """method to get given date prayer times dictionary
-        :param coordinates: (tuple[int,int]) a tuple containing the lat & long coordinates
-        :param date: (datetime.datetime) the date to get the prayer times for
-        :return: (dict) dictionary of prayer name-prayer datetime pairs
-        """
-        method = self.calculation_methods.get(
-            self.settings["-default-method-"], self.calculation_methods[4])
-
-        params = CalculationParameters(method,
-                                       adjustments=self.prayer_offsets)
-
-        pt_object = PrayerTimes(coordinates, date,
-                                calculation_parameters=params,
-                                time_zone=ZoneInfo(self.settings["-location-"]["-timezone-"]))
-
-        return {name: getattr(pt_object, name.lower()) for name in self.displayed_times}
-
-    def update_current_and_next_prayer(self):
-        """function to set the current & next fard from the furood dict & update the dict used if Isha passed
-        :return: (bool) whether Isha passed (i.e current furood times were changed) or no,
-        in order for the main window to update the prayer times displayed
-        """
-        isha_passed = False
-        self.tomorrow = self.now+datetime.timedelta(days=1)
-
-        # If isha is the current fard, update the furood dict to set the fajr of tomorrow
-        if self.now >= self.current_furood["Isha"]:
-            self.current_fard = ("Isha", self.current_furood["Isha"])
-            self.current_furood = self.get_prayers_dict(
-                self.settings["-location-"]["-coordinates-"], self.tomorrow)
-            self.upcoming_prayer = ("Fajr", self.current_furood["Fajr"])
-            isha_passed = True
-
-        elif self.now >= self.current_furood["Maghrib"]:
-            self.current_fard = ("Maghrib", self.current_furood["Maghrib"])
-            self.upcoming_prayer = ("Isha", self.current_furood["Isha"])
-
-        elif self.now >= self.current_furood["Asr"]:
-            self.current_fard = ("Asr", self.current_furood["Asr"])
-            self.upcoming_prayer = ("Maghrib", self.current_furood["Maghrib"])
-
-        elif self.now >= self.current_furood["Dhuhr"]:
-            self.current_fard = ("Dhuhr", self.current_furood["Dhuhr"])
-            self.upcoming_prayer = ("Asr", self.current_furood["Asr"])
-
-        elif self.now >= self.current_furood["Sunrise"]:
-            self.current_fard = ("Sunrise", self.current_furood["Sunrise"])
-            self.upcoming_prayer = ("Dhuhr", self.current_furood["Dhuhr"])
-
-        elif self.now >= self.current_furood["Fajr"]:
-            self.current_fard = ("Fajr", self.current_furood["Fajr"])
-            self.upcoming_prayer = ("Sunrise", self.current_furood["Sunrise"])
-
-        else:
-            self.current_fard = ("Isha", self.current_furood["Isha"])
-            self.upcoming_prayer = ("Fajr", self.current_furood["Fajr"])
-
-        return isha_passed
-
-    # ---------------------------------------- UI methods ---------------------------------------- #
-
     def choose_location_if_not_saved(self) -> dict:
         """function to get & set the user location
         :return: (dict) dictionary of the chosen location json data
@@ -628,102 +569,7 @@ class Athany:
         if self.settings["-location-"].get("-coordinates-", None) is None:
             # If there are no saved settings, display the choose location window to set these values
             self.choose_location = self.generate_location_window()
-
-            self.choose_location.perform_long_operation(
-                self.get_current_location, "-AUTOMATIC-LOCATION-THREAD-")
-            while True:
-                location_data = False
-                event, values = self.choose_location.read()
-
-                if event in (sg.WIN_CLOSED, "-CANCEL-"):
-                    self.close_app_windows()
-                    break
-
-                elif event == "-AUTOMATIC-LOCATION-THREAD-":
-                    self.location_api = values["-AUTOMATIC-LOCATION-THREAD-"]
-                    self.choose_location["-AUTO-LOCATION-"].update(value=f"({self.location_api[0]}, {self.location_api[1]})" if not isinstance(
-                        self.location_api, str) else f"({self.translator.translate('Internet connection required')})")
-                else:
-                    if event == "-OK-":
-                        city = values["-CITY-"].strip().capitalize()
-                        country = values["-COUNTRY-"].strip().capitalize()
-                        if len(city+country) < 4:
-                            continue
-                        if len(country) == 2:
-                            country = country.upper()
-
-                        self.choose_location["-LOC-TXT-"].update(
-                            value=self.translator.translate(
-                                "Fetching location data for:")
-                        )
-                        self.choose_location["-LOCATION-NAME-"].update(
-                            value=f"({city}, {country})")
-                        self.choose_location.refresh()
-
-                        location_data = self.fetch_calculation_data(city,
-                                                                    country)
-
-                        if location_data is None:  # if invalid city/country dont continue
-                            self.choose_location["-LOC-TXT-"].update(
-                                value=self.translator.translate("Invalid city or country, enter a valid location"))
-                            self.choose_location["-LOCATION-NAME-"].update(
-                                value="")
-                            self.choose_location["-CITY-"].update(
-                                background_color="dark red")
-                            self.choose_location["-COUNTRY-"].update(
-                                background_color="dark red")
-                            continue
-
-                    elif event == "-USE-CURRENT-LOCATION-":
-                        if not isinstance(self.location_api, tuple):
-                            self.location_api = self.get_current_location()
-                        if self.location_api == "RequestError":
-                            self.choose_location["-LOC-TXT-"].update(
-                                value=self.translator.translate("An error occurred, try entering location manually"))
-                            self.choose_location["-LOCATION-NAME-"].update(
-                                value="")
-                            self.choose_location.refresh()
-
-                        else:
-                            city = self.location_api[0]
-                            country = self.location_api[1]
-
-                            self.choose_location["-LOC-TXT-"].update(
-                                value=self.translator.translate(
-                                    "Fetching location data for:")
-                            )
-                            self.choose_location["-LOCATION-NAME-"].update(
-                                value=f"({city}, {country})")
-                            self.choose_location.refresh()
-
-                            location_data = self.fetch_calculation_data(city,
-                                                                        country)
-
-                    if not location_data:
-                        continue
-
-                    if location_data == "RequestError":
-                        self.choose_location["-LOC-TXT-"].update(
-                            value="Internet connection required")
-                        self.choose_location["-LOCATION-NAME-"].update(
-                            value="")
-                    else:
-                        self.settings["-location-"]["-city-"] = city
-                        self.settings["-location-"]["-country-"] = country
-                        self.settings["-location-"]["-coordinates-"] = (
-                            location_data["latitude"],
-                            location_data["longitude"]
-                        )
-                        self.settings["-location-"]["-timezone-"] = location_data["timezone"]
-                        self.settings.save()
-                        self.settings["-default-method-"] = location_data["method"]["id"]
-
-                        self.save_loc_check = values["-SAVE-LOC-CHECK-"]
-
-                        # close location choosing window
-                        self.close_app_windows()
-
-                        return location_data
+            location_data = self.choose_location.run_event_loop()
 
         else:
             self.save_loc_check = True
@@ -731,304 +577,21 @@ class Athany:
                 self.settings["-location-"]["-city-"],
                 self.settings["-location-"]["-country-"])
 
-            return location_data
-
-    def check_if_prayer_time_came(self):
-        """method to check whether next prayer time came & notify the user if that's the case
-
-        :return bool: whether the upcoming prayer time came or not
-        """
-        self.now = datetime.datetime.now(
-            tz=ZoneInfo(self.settings["-location-"]["-timezone-"])).replace(microsecond=0)
-
-        return self.now >= self.upcoming_prayer[1]
-
-    def show_notification_and_athan(self):
-        """method to send notification to the user and play athan sound when prayer time comes
-        """
-        if self.current_fard[0] != "Sunrise":
-            self.application_tray.show_message(
-                title="Athany 🕌", message=self.translator.translate(f"It's time for {self.current_fard[0]} prayer"))
-
-            # play athan sound from user athan sound settings (if athan sound not muted)
-            if not self.settings["-mute-athan-"]:
-                try:
-                    self.play_current_athan()
-                except RuntimeError:
-                    print(
-                        "[DEBUG] Couldn't play athan audio, rechoose your athan in the app settings")
-
-    def highlight_current_fard_in_ui(self):
-        """method to highlight the current fard in the main app UI
-        """
-        for name in self.displayed_times:
-            self.window[f"-{name.upper()}-"].update(font=self.GUI_FONT,
-                                                    text_color=sg.theme_text_color())
-            self.window[f"-{name.upper()}-TIME-"].update(font=self.GUI_FONT,
-                                                         text_color=sg.theme_text_color())
-
-        if self.current_fard[0] == "Sunrise":
-            self.window["-FAJR-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-            self.window["-FAJR-TIME-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-        else:
-            self.window[f"-{self.current_fard[0].upper()}-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-            self.window[f"-{self.current_fard[0].upper()}-TIME-"].update(
-                font=(self.GUI_FONT[0], self.GUI_FONT[1], "italic"), text_color='#cd8032')
-
-    def refresh_prayers_in_ui(self, prayer_times_changed: bool):
-        """method to update the display of the main window depending on the current fard
-            & display tomorrow prayer times if isha passed
-
-        :param bool prayer_times_changed: True if the current_furood dict was changed
-        """
-        # Highlight current fard in main window
-        self.highlight_current_fard_in_ui()
-
-        # If current_furood dict was changed,
-        # then update the ui with the next day prayers starting from Fajr
-        if prayer_times_changed:
-            for prayer, time in self.current_furood.items():
-                self.window[f"-{prayer.upper()}-TIME-"].update(
-                    value=time.strftime("%I:%M %p"))
-
-    # ---------------------------- event handlers ---------------------------- #
-
-    def main_event_loop(self):
-        """main window event handling loop
-        """
-        win2_active = False
-        while True:
-
-            if self.check_if_prayer_time_came():
-                pt_changed = self.update_current_and_next_prayer()
-                self.show_notification_and_athan()
-                self.refresh_prayers_in_ui(pt_changed)
-
-            # get remaining time till next prayer
-            time_d = self.upcoming_prayer[1] - self.now
-
-            # update the main window with the next prayer and remaining time
-            self.window["-NEXT-PRAYER-"].update(
-                value=self.translator.translate(self.upcoming_prayer[0]))
-            self.window["-TIME-D-"].update(value=str(time_d))
-
-            # update the current dates
-            self.window["-CURRENT-TIME-"].update(
-                value=self.now.strftime("%I:%M %p"))
-            self.window["-TODAY-"].update(
-                value=self.now.date().strftime("%a %d %b %y"))
-            self.window["-TODAY_HIJRI-"].update(
-                value=self.get_hijri_date(self.now))
-
-            # update system tray tooltip also
-            self.application_tray.set_tooltip(
-                f"{self.upcoming_prayer[0]} in {time_d}")
-
-            # main event reading
-            event1, values1 = self.window.read(timeout=100)
-
-            if event1 == self.application_tray.key:
-                event1 = values1[event1]
-                # Debugging
-                print("[DEBUG] SystemTray event:", event1)
-
-            # Event check and preform action
-            if event1 in (sg.WIN_CLOSED, "-EXIT-", "Exit"):
-                break
-
-            if event1 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "Hide Window"):
-                self.window.hide()
-                self.application_tray.show_icon()
-                self.application_tray.show_message(title="Athany minimized to system tray",
-                                                   message="To completely close the app, press 'Exit'")
-
-            elif event1 in ("Show Window", sg.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
-                self.window.un_hide()
-                self.window.bring_to_front()
-
-            elif event1 in ("-STOP-ATHAN-", "Stop athan"):
-                mixer.music.unload()
-
-            # if clicked settings button,
-            # open up the settings window and read values from it along with the main window
-            elif event1 in ("-SETTINGS-", "Settings") and not win2_active:
-                win2_active = True
-                settings_window = self.generate_settings_window()
-
-            # If 2nd window (settings window) is open, run the settings window event handling method
-            if win2_active:
-                win2_active = self.handle_settings_window_event(
-                    settings_window)
-            else:
-                settings_window = None
-
-    def handle_settings_window_event(self, settings_window: sg.Window):
-        """method for handling events that come from the settings window
-
-        :param PySimpleGUI.Window settings_window: the settings window to read values from
-        :return bool: boolean value that indicates whether the settings window is still open or not
-        """
-        win2_active = True
-        event2, values2 = settings_window.read(timeout=100)
-        settings_window.disable_debugger()
-
-        if event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
-            win2_active = False
-            offset_changed = False
-            action_type = values2.get("-DONE-", None)
-            print("[DEBUG] Settings exit action:", action_type)
-            self.save_loc_check = settings_window["-TOGGLE-SAVE-LOCATION-"].metadata
-            self.settings["-custom-athan-"] = settings_window["-CUSTOM-ATHAN-NAME-"].get()
-
-            for prayer in self.current_furood:
-                pt_offset = settings_window[f"-{prayer.upper()}-OFFSET-"].get()
-                if self.settings["-offset-"][f"-{prayer}-"] != pt_offset:
-                    self.settings["-offset-"][f"-{prayer}-"] = pt_offset
-                    self.settings.save()
-                    offset_changed = True
-
-            settings_window.close()
-
-            if offset_changed:
-                self.restart_app = self.yes_or_no_popup(
-                    "Prayer offsets were changed, do you want to restart application?")
-
-            if action_type == "-RESTART-" or self.restart_app:
-                mixer.music.unload()
-                self.restart_app = True
-                self.window.write_event_value("-EXIT-", None)
-
-            elif action_type == "-EXIT-":
-                self.window.write_event_value("-EXIT-", None)
-
-        elif event2 in ("-EXIT-", "-RESTART-"):
-            settings_window.write_event_value(
-                "-DONE-", event2)
-
-        elif event2 in "-TOGGLE-MUTE-":
-            settings_window["-TOGGLE-MUTE-"].metadata = not settings_window["-TOGGLE-MUTE-"].metadata
-            settings_window["-TOGGLE-MUTE-"].update(
-                image_data=TOGGLE_ON_B64 if settings_window["-TOGGLE-MUTE-"].metadata else TOGGLE_OFF_B64)
-
-            self.settings["-mute-athan-"] = settings_window["-TOGGLE-MUTE-"].metadata
-
-        elif event2 == "-TOGGLE-CUSTOM-ATHAN-":
-            settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata = not settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata
-            settings_window["-TOGGLE-CUSTOM-ATHAN-"].update(
-                image_data=TOGGLE_ON_B64 if settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata else TOGGLE_OFF_B64)
-
-            self.settings["-use-custom-athan-"] = settings_window["-TOGGLE-CUSTOM-ATHAN-"].metadata
-
-            settings_window["-DROPDOWN-ATHANS-"].update(
-                disabled=self.settings["-use-custom-athan-"])
-            settings_window["-CUSTOM-ATHAN-BROWSE-"].update(
-                disabled=not self.settings["-use-custom-athan-"])
-
-            if self.settings["-use-custom-athan-"]:
-                settings_window["-DROPDOWN-ATHANS-"].update(
-                    value="Custom")
-            else:
-                settings_window["-DROPDOWN-ATHANS-"].update(
-                    value=self.settings["-athan-sound-"][:-4].replace("_", " "))
-
-        elif event2 == "-TOGGLE-SAVE-LOCATION-":
-            settings_window["-TOGGLE-SAVE-LOCATION-"].metadata = not settings_window["-TOGGLE-SAVE-LOCATION-"].metadata
-            settings_window["-TOGGLE-SAVE-LOCATION-"].update(
-                image_data=TOGGLE_ON_B64 if settings_window["-TOGGLE-SAVE-LOCATION-"].metadata else TOGGLE_OFF_B64)
-
-        elif event2 == "-DROPDOWN-LANG-" and self.settings["-lang-"] != values2["-DROPDOWN-LANG-"]:
-            self.settings["-lang-"] = values2["-DROPDOWN-LANG-"]
-            self.restart_app = self.yes_or_no_popup(
-                "App language was changed, do you want to restart?")
-            if self.restart_app:
-                settings_window.write_event_value(
-                    "-DONE-", "-RESTART-")
-
-        elif event2 == "-DROPDOWN-THEMES-":
-            self.chosen_theme = values2["-DROPDOWN-THEMES-"]
-            if self.chosen_theme != self.settings["-theme-"]:
-                self.restart_app = self.yes_or_no_popup(
-                    "Theme was changed, Do you want to restart application?")
-                if self.restart_app:
-                    settings_window.write_event_value(
-                        "-DONE-", "-RESTART-")
-
-        elif event2 == "-DROPDOWN-ATHANS-":
-            # get a list of all athans currently in folder
-            # as user might have downloaded before
-            DOWNLOADED_ATHANS = os.listdir(ATHANS_DIR)
-            # convert option into filename
-            chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.mp3"
-
-            if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
-                self.settings["-athan-sound-"] = chosen_athan
-                self.play_current_athan()
-
-            else:  # athan is not on pc, will be downloaded from the internet
-                settings_window["-DONE-"].update(disabled=True)
-                settings_window["-RESTART-"].update(disabled=True)
-                settings_window["-EXIT-"].update(disabled=True)
-                settings_window["-DISPLAYED-MSG-"].update(
-                    value=self.translator.translate("Establishing connection..."))
-                settings_window.refresh()
-
-                mixer.music.unload()
-
-                # run the download function to get athan from archive
-                downloaded = self.download_athan(chosen_athan)
-                if downloaded:  # if all went well, set as new athan and play audio
-                    self.settings["-athan-sound-"] = chosen_athan
-                    settings_window["-DISPLAYED-MSG-"].update(
-                        value=self.translator.translate("Current athan"))
-                    settings_window.refresh()
-
-                    self.play_current_athan()
-
-                else:  # something messed up during download or no internet
-                    settings_window["-DISPLAYED-MSG-"].update(
-                        value=self.translator.translate("Current athan"))
-                    settings_window["-DROPDOWN-ATHANS-"].update(
-                        value=self.settings["-athan-sound-"][:-4].replace("_", " "))
-                    self.application_tray.show_message(
-                        title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
-
-                settings_window["-DONE-"].update(disabled=False)
-                settings_window["-RESTART-"].update(disabled=False)
-                settings_window["-EXIT-"].update(disabled=False)
-            # Debugging
-            print("[DEBUG] Current athan:",
-                  self.settings["-athan-sound-"])
-
-        return win2_active
+        return location_data
 
     # ---------------------- startup & shutdown methods ---------------------- #
-
-    def start_system_tray(self, win: sg.Window) -> SystemTray:
-        """starts the SystemTray object and instantiates it"s menu and tooltip
-        :return: (psgtray.SystemTray) systemtray object for application
-        """
-        menu = ["", ["Show Window", "Hide Window", "---", "Stop athan",
-                     "Settings", "Exit"]]
-        tray = SystemTray(menu=menu, tooltip="Next Prayer",
-                          window=win, icon=APP_ICON)
-        tray.show_message(
-            title="Athany", message="Choose 'Hide Window' or close the window to minimize application to system tray")
-        return tray
 
     def display_main_window(self, init_main_layout):
         """Displays the main application window, keeps running until window is closed
         :param init_main_layout: (list) main application window layout
         """
         mixer.init(frequency=16000)
-        self.window = sg.Window("Athany: a python athan app",
-                                init_main_layout,
-                                enable_close_attempted_event=True,
-                                finalize=True)
+        self.window = MainWindow(self,
+                                 title="Athany: a python athan app",
+                                 layout=init_main_layout,
+                                 enable_close_attempted_event=True,
+                                 finalize=True)
 
-        self.window.disable_debugger()
         if self.translator.bidirectional:
             self.window["-RIGHT-DECORATION-"].update(
                 value=sg.SYMBOL_LEFT_ARROWHEAD)
@@ -1040,10 +603,9 @@ class Athany:
             self.window["-RIGHT-DECORATION-"].update(
                 value=sg.SYMBOL_RIGHT_ARROWHEAD)
 
-        self.application_tray = self.start_system_tray(win=self.window)
-        self.highlight_current_fard_in_ui()
-
-        self.main_event_loop()
+        self.window.start_system_tray()
+        self.window.highlight_current_fard_in_ui()
+        self.window.run_event_loop()
 
         # when the event loop ends, close the application
         self.close_app_windows()
@@ -1051,23 +613,13 @@ class Athany:
     def close_app_windows(self):
         """function to properly close all app windows before shutting down"""
         try:
-
-            if self.choose_location:
-                self.choose_location.close()
-                del self.choose_location
-
+            self.choose_location.close()
+            del self.choose_location
         except AttributeError:
             pass
 
         try:
-
-            if self.application_tray:
-                self.application_tray.close()
-                del self.application_tray
-
-            if self.window:
-                self.window.close()
-                del self.window
-
+            self.window.close()
+            del self.window
         except AttributeError:
             pass

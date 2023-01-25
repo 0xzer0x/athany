@@ -1,3 +1,4 @@
+"""main file to start athany app instance"""
 import src.athany
 
 if __name__ == "__main__":
