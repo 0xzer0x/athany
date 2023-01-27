@@ -1,8 +1,6 @@
 import os
 import json
 import sys
-import datetime
-from zoneinfo import ZoneInfo
 
 import requests
 import hijri_converter
@@ -14,8 +12,8 @@ from src.translator import Translator
 if sys.platform == "win32":
     # library for system notifications on Windows
     import ctypes
-    myappid = "athany notifications"
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        "athany notifications")
 
 DATA_DIR = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), "Data")
@@ -266,8 +264,7 @@ class Athany:
                          [sz for sz in range(-59, 60)], initial_value=self.settings["-offset-"]["-Dhuhr-"],
                          key="-DHUHR-OFFSET-", readonly=True, text_color="black")
                          ]
-                    ]), pad=((5, 5), (10, 5))),
-                sg.Push(),
+                    ]), expand_x=True),
                 sg.Col(
                     self.translator.adjust_layout_direction([
                         [TranslatedText(self.translator, "Asr offset"),
@@ -286,7 +283,12 @@ class Athany:
                          key="-ISHA-OFFSET-", readonly=True, text_color="black")
                          ]
                     ]
-                    ), pad=((5, 5), (10, 5)))
+                    ), expand_x=True)
+            ],
+            [
+                sg.Push(),
+                TranslatedButton(self.translator, "Reset",
+                                 key="-RESET-OFFSET-", font=self.BUTTON_FONT)
             ]
         ])
 

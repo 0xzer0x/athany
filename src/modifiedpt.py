@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from adhanpy.PrayerTimes import PrayerTimes
 from adhanpy.calculation.PrayerAdjustments import PrayerAdjustments
 from adhanpy.calculation import CalculationMethod, CalculationParameters
+from adhanpy.calculation.MethodsParameters import methods_parameters
 
 
 class ModifiedPrayerTimes(PrayerTimes):
@@ -74,7 +75,7 @@ class ModifiedPrayerTimes(PrayerTimes):
         return self.now >= self.upcoming_fard[1]
 
     def update_current_furood(self, date: datetime.datetime):
-        """method to update the current_furood attribute with prayer times of the given date 
+        """method to update the current_furood attribute with prayer times of the given date
 
         :param datetime.datetime date: date to get pt for
         """
@@ -146,3 +147,11 @@ class ModifiedPrayerTimes(PrayerTimes):
         for identifier, details in self.calculation_methods.items():
             if method_name == details[1]:
                 return identifier
+
+    def get_method_params(self, method_id):
+        """method to get the parameters used for calculation by one of the standard methods
+
+        :param int method_id: method id as in the calculation_methods dictionary
+        :return dict: dictionary containing key-value pairs of calculation parameters
+        """
+        return methods_parameters[self.calculation_methods[method_id][0]]

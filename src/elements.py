@@ -3,7 +3,6 @@ import os
 from pygame import mixer
 import PySimpleGUI as sg
 from psgtray import SystemTray
-from adhanpy.calculation.MethodsParameters import methods_parameters
 
 
 DATA_DIR = os.path.join(os.path.dirname(
@@ -217,28 +216,17 @@ class SettingsWindow(sg.Window):
 
         elif event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
             win_active = False
-            offset_changed = False
             action_type = values2.get("-DONE-", None)
             print("[DEBUG] Settings exit action:", action_type)
             self.parent.save_loc_check = self["-TOGGLE-SAVE-LOCATION-"].metadata
             self.parent.settings["-custom-athan-"] = self["-CUSTOM-ATHAN-NAME-"].get()
 
-            for prayer in self.parent.pt.current_furood:
-                pt_offset = self[f"-{prayer.upper()}-OFFSET-"].get()
-                if self.parent.settings["-offset-"][f"-{prayer}-"] != pt_offset:
-                    self.parent.settings["-offset-"][f"-{prayer}-"] = pt_offset
-                    self.parent.settings.save()
-                    offset_changed = True
+            if self.offset_changed():
+                self.parent.pt.update_prayer_offset()
+                self.apply_calculation_changes()
 
             self.close()
-
-            if offset_changed:
-                self.parent.pt.update_prayer_offset()
-                self.parent.pt.update_current_furood(self.parent.pt.now)
-                self.parent.pt.update_current_and_next_prayer()
-                self.parent.window.refresh_prayers_in_ui(True)
-
-            if action_type == "-RESTART-" or self.parent.restart_app:
+            if action_type == "-RESTART-":
                 mixer.music.unload()
                 self.parent.restart_app = True
                 self.parent.window.write_event_value("-EXIT-", None)
@@ -251,17 +239,11 @@ class SettingsWindow(sg.Window):
                 "-DONE-", event2)
 
         elif event2 == "-TOGGLE-MUTE-":
-            self["-TOGGLE-MUTE-"].metadata = not self["-TOGGLE-MUTE-"].metadata
-            self["-TOGGLE-MUTE-"].update(
-                image_data=TOGGLE_ON_B64 if self["-TOGGLE-MUTE-"].metadata else TOGGLE_OFF_B64)
-
+            self.change_toggle_button_state(event2)
             self.parent.settings["-mute-athan-"] = self["-TOGGLE-MUTE-"].metadata
 
         elif event2 == "-TOGGLE-CUSTOM-ATHAN-":
-            self["-TOGGLE-CUSTOM-ATHAN-"].metadata = not self["-TOGGLE-CUSTOM-ATHAN-"].metadata
-            self["-TOGGLE-CUSTOM-ATHAN-"].update(
-                image_data=TOGGLE_ON_B64 if self["-TOGGLE-CUSTOM-ATHAN-"].metadata else TOGGLE_OFF_B64)
-
+            self.change_toggle_button_state(event2)
             self.parent.settings["-use-custom-athan-"] = self["-TOGGLE-CUSTOM-ATHAN-"].metadata
 
             self["-DROPDOWN-ATHANS-"].update(
@@ -277,9 +259,7 @@ class SettingsWindow(sg.Window):
                     value=self.parent.settings["-athan-sound-"][:-4].replace("_", " "))
 
         elif event2 == "-TOGGLE-SAVE-LOCATION-":
-            self["-TOGGLE-SAVE-LOCATION-"].metadata = not self["-TOGGLE-SAVE-LOCATION-"].metadata
-            self["-TOGGLE-SAVE-LOCATION-"].update(
-                image_data=TOGGLE_ON_B64 if self["-TOGGLE-SAVE-LOCATION-"].metadata else TOGGLE_OFF_B64)
+            self.change_toggle_button_state(event2)
 
         elif event2 == "-DROPDOWN-LANG-" and self.parent.settings["-lang-"] != values2["-DROPDOWN-LANG-"]:
             self.parent.settings["-lang-"] = values2["-DROPDOWN-LANG-"]
@@ -301,45 +281,15 @@ class SettingsWindow(sg.Window):
         elif event2 == "-DROPDOWN-ATHANS-":
             # get a list of all athans currently in folder
             # as user might have downloaded before
-            DOWNLOADED_ATHANS = os.listdir(ATHANS_DIR)
-            # convert option into filename
+            downloaded_athans = os.listdir(ATHANS_DIR)
             chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.mp3"
-
-            if chosen_athan in DOWNLOADED_ATHANS:  # athan is already in Athans directory
+            if chosen_athan in downloaded_athans:  # athan is already in Athans directory
                 self.parent.settings["-athan-sound-"] = chosen_athan
                 self.parent.play_current_athan()
 
             else:  # athan is not on pc, will be downloaded from the internet
-                self["-DONE-"].update(disabled=True)
-                self["-RESTART-"].update(disabled=True)
-                self["-EXIT-"].update(disabled=True)
-                self["-DISPLAYED-MSG-"].update(
-                    value="Establishing connection...")
-                self.refresh()
+                self.start_download_process(chosen_athan)
 
-                mixer.music.unload()
-
-                # run the download function to get athan from archive
-                downloaded = self.parent.download_athan(chosen_athan)
-                if downloaded:  # if all went well, set as new athan and play audio
-                    self.parent.settings["-athan-sound-"] = chosen_athan
-                    self["-DISPLAYED-MSG-"].update(
-                        value="Current athan")
-                    self.refresh()
-
-                    self.parent.play_current_athan()
-
-                else:  # something messed up during download or no internet
-                    self["-DISPLAYED-MSG-"].update(
-                        value="Current athan")
-                    self["-DROPDOWN-ATHANS-"].update(
-                        value=self.parent.settings["-athan-sound-"][:-4].replace("_", " "))
-                    self.parent.window.sys_tray.show_message(
-                        title="Download Failed", message=f"Couldn't download athan file: {chosen_athan}")
-
-                self["-DONE-"].update(disabled=False)
-                self["-RESTART-"].update(disabled=False)
-                self["-EXIT-"].update(disabled=False)
             # Debugging
             print("[DEBUG] Current athan:",
                   self.parent.settings["-athan-sound-"])
@@ -356,16 +306,14 @@ class SettingsWindow(sg.Window):
                     disabled=False, text_color=sg.theme_input_text_color())
             else:
                 self["-SET-CUSTOM-ANGLES-"].update(disabled=True)
-                used_method = methods_parameters[
-                    self.parent.pt.calculation_methods[self.parent.settings["-used-method-"]][0]]
+                used_method_params = self.parent.pt.get_method_params(
+                    self.parent.settings["-used-method-"])
                 self["-FAJR-ANGLE-IN-"].update(
-                    value=used_method["fajr_angle"], disabled=True, text_color="grey")
+                    value=used_method_params["fajr_angle"], disabled=True, text_color="grey")
                 self["-ISHA-ANGLE-IN-"].update(
-                    value=used_method.get("isha_angle", "not used"), disabled=True, text_color="grey")
+                    value=used_method_params.get("isha_angle", "not used"), disabled=True, text_color="grey")
 
-            self.parent.pt.update_current_furood(self.parent.pt.now)
-            self.parent.pt.update_current_and_next_prayer()
-            self.parent.window.refresh_prayers_in_ui(True)
+            self.apply_calculation_changes()
 
         elif event2 == "-SET-CUSTOM-ANGLES-":
             try:
@@ -375,9 +323,7 @@ class SettingsWindow(sg.Window):
                     raise ValueError
 
                 self.parent.settings["-custom-angles-"] = [fajr, isha]
-                self.parent.pt.update_current_furood(self.parent.pt.now)
-                self.parent.pt.update_current_and_next_prayer()
-                self.parent.window.refresh_prayers_in_ui(True)
+                self.apply_calculation_changes()
 
                 self["-FAJR-ANGLE-IN-"].update(
                     background_color=sg.theme_input_background_color())
@@ -390,7 +336,74 @@ class SettingsWindow(sg.Window):
                 self["-ISHA-ANGLE-IN-"].update(
                     background_color="dark red")
 
+        elif event2 == "-RESET-OFFSET-":
+            self.reset_prayer_offsets()
+
         return win_active
+
+    def change_toggle_button_state(self, key):
+        """method to toggle the state of a button using it's metadata attribute
+
+        :param str key: toggle button key in the window
+        """
+        self[key].metadata = not self[key].metadata
+        self[key].update(
+            image_data=TOGGLE_ON_B64 if self[key].metadata else TOGGLE_OFF_B64)
+
+    def start_download_process(self, athan_filename):
+        """method to handle downloading of athan file"""
+        self["-DONE-"].update(disabled=True)
+        self["-RESTART-"].update(disabled=True)
+        self["-EXIT-"].update(disabled=True)
+        self["-DISPLAYED-MSG-"].update(
+            value="Establishing connection...")
+        self.refresh()
+
+        mixer.music.unload()
+
+        # run the download function to get athan from archive
+        downloaded = self.parent.download_athan(athan_filename)
+        if downloaded:  # if all went well, set as new athan and play audio
+            self.parent.settings["-athan-sound-"] = athan_filename
+            self.parent.play_current_athan()
+
+        else:  # something messed up during download or no internet
+            self["-DROPDOWN-ATHANS-"].update(
+                value=self.parent.settings["-athan-sound-"][:-4].replace("_", " "))
+            self.parent.window.sys_tray.show_message(
+                title="Download Failed", message=f"Couldn't download athan file: {athan_filename}")
+
+        self["-DISPLAYED-MSG-"].update(
+            value="Current athan")
+        self["-EXIT-"].update(disabled=False)
+        self["-RESTART-"].update(disabled=False)
+        self["-DONE-"].update(disabled=False)
+
+    def apply_calculation_changes(self):
+        """method to apply changes made to prayer times calculation and display the new times"""
+        self.parent.pt.update_current_furood(self.parent.pt.now)
+        self.parent.pt.update_current_and_next_prayer()
+        self.parent.window.refresh_prayers_in_ui(True)
+
+    def offset_changed(self) -> bool:
+        """method to check whether prayer offsets were changed & save their new values
+        :return: (bool) boolean value to indicate whether prayer offsets changed or no
+        """
+        offset_changed = False
+        for prayer in self.parent.displayed_times:
+            pt_offset = self[f"-{prayer.upper()}-OFFSET-"].get()
+            if self.parent.settings["-offset-"][f"-{prayer}-"] != pt_offset:
+                self.parent.settings["-offset-"][f"-{prayer}-"] = pt_offset
+                self.parent.settings.save()
+                offset_changed = True
+
+        return offset_changed
+
+    def reset_prayer_offsets(self):
+        """method to reset all prayer offsets to zero"""
+        for prayer in self.parent.displayed_times:
+            self.parent.settings["-offset-"][f"-{prayer}-"] = 0
+            self[f"-{prayer.upper()}-OFFSET-"].update(value=0)
 
 
 class ChooseLocationWindow(sg.Window):
