@@ -69,17 +69,25 @@ class Athany:
         if sys.platform == "win32":
             self.GUI_FONT = ("Readex Pro", 11)
             self.HIJRI_DATE_FONT = ("Arabic Typesetting", 20)
+            if self.settings["-lang-"] == 'ar':
+                self.BUTTON_FONT = (self.GUI_FONT[0], 8)
+                self.MONO_FONT = (self.GUI_FONT[0], 9)
+                self.settings_button_width = 10
+            else:
+                self.MONO_FONT = ("IBM Plex Mono", 10)
+                self.BUTTON_FONT = ("Helvetica", 9)
+                self.settings_button_width = 6
         else:
-            self.GUI_FONT = ("Droid Sans Arabic", 11)
-            self.HIJRI_DATE_FONT = (self.GUI_FONT[0], 12)
-        if self.settings["-lang-"] == 'ar':
-            self.BUTTON_FONT = (self.GUI_FONT[0], 8)
-            self.MONO_FONT = (self.GUI_FONT[0], 9)
-            self.settings_button_width = 10
-        else:
-            self.MONO_FONT = ("IBM Plex Mono", 10)
-            self.BUTTON_FONT = ("Helvetica", 9)
-            self.settings_button_width = 6
+            self.GUI_FONT = ("STC", 13)
+            self.HIJRI_DATE_FONT = (self.GUI_FONT[0], 14)
+            if self.settings["-lang-"] == 'ar':
+                self.BUTTON_FONT = (self.GUI_FONT[0], 9)
+                self.MONO_FONT = (self.GUI_FONT[0], 10)
+                self.settings_button_width = 10
+            else:
+                self.MONO_FONT = ("IBM Plex Mono", 10)
+                self.BUTTON_FONT = ("Helvetica", 9)
+                self.settings_button_width = 6
 
         self.location_api = None
         self.restart_app, self.save_loc_check = False, False
