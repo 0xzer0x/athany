@@ -250,7 +250,7 @@ class SettingsWindow(sg.Window):
             self.write_event_value(
                 "-DONE-", event2)
 
-        elif event2 in "-TOGGLE-MUTE-":
+        elif event2 == "-TOGGLE-MUTE-":
             self["-TOGGLE-MUTE-"].metadata = not self["-TOGGLE-MUTE-"].metadata
             self["-TOGGLE-MUTE-"].update(
                 image_data=TOGGLE_ON_B64 if self["-TOGGLE-MUTE-"].metadata else TOGGLE_OFF_B64)
@@ -372,7 +372,7 @@ class SettingsWindow(sg.Window):
                 fajr = float(self["-FAJR-ANGLE-IN-"].get())
                 isha = float(self["-ISHA-ANGLE-IN-"].get())
                 if fajr < 0 or isha < 0 or fajr > 20 or isha > 20:
-                    raise TypeError
+                    raise ValueError
 
                 self.parent.settings["-custom-angles-"] = [fajr, isha]
                 self.parent.pt.update_current_furood(self.parent.pt.now)
