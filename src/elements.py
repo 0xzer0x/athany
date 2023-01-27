@@ -201,146 +201,6 @@ class SettingsWindow(sg.Window):
         self.parent = parent
         super().__init__(**kwargs)
 
-    def run_event_loop(self, timeout=100):
-        """method for handling events that come from the settings window
-
-        :param int timeout: the timeout for the read method
-        :return bool: boolean value that indicates whether the settings window is still open or not
-        """
-        win_active = True
-        event2, values2 = self.read(timeout=timeout)
-        self.disable_debugger()
-
-        if event2 == sg.TIMEOUT_KEY:
-            pass
-
-        elif event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
-            win_active = False
-            action_type = values2.get("-DONE-", None)
-            print("[DEBUG] Settings exit action:", action_type)
-            self.parent.save_loc_check = self["-TOGGLE-SAVE-LOCATION-"].metadata
-            self.parent.settings["-custom-athan-"] = self["-CUSTOM-ATHAN-NAME-"].get()
-
-            if self.offset_changed():
-                self.parent.pt.update_prayer_offset()
-                self.apply_calculation_changes()
-
-            self.close()
-            if action_type == "-RESTART-":
-                mixer.music.unload()
-                self.parent.restart_app = True
-                self.parent.window.write_event_value("-EXIT-", None)
-
-            elif action_type == "-EXIT-":
-                self.parent.window.write_event_value("-EXIT-", None)
-
-        elif event2 in ("-EXIT-", "-RESTART-"):
-            self.write_event_value(
-                "-DONE-", event2)
-
-        elif event2 == "-TOGGLE-MUTE-":
-            self.change_toggle_button_state(event2)
-            self.parent.settings["-mute-athan-"] = self["-TOGGLE-MUTE-"].metadata
-
-        elif event2 == "-TOGGLE-CUSTOM-ATHAN-":
-            self.change_toggle_button_state(event2)
-            self.parent.settings["-use-custom-athan-"] = self["-TOGGLE-CUSTOM-ATHAN-"].metadata
-
-            self["-DROPDOWN-ATHANS-"].update(
-                disabled=self.parent.settings["-use-custom-athan-"])
-            self["-CUSTOM-ATHAN-BROWSE-"].update(
-                disabled=not self.parent.settings["-use-custom-athan-"])
-
-            if self.parent.settings["-use-custom-athan-"]:
-                self["-DROPDOWN-ATHANS-"].update(
-                    value="Custom")
-            else:
-                self["-DROPDOWN-ATHANS-"].update(
-                    value=self.parent.settings["-athan-sound-"][:-4].replace("_", " "))
-
-        elif event2 == "-TOGGLE-SAVE-LOCATION-":
-            self.change_toggle_button_state(event2)
-
-        elif event2 == "-DROPDOWN-LANG-" and self.parent.settings["-lang-"] != values2["-DROPDOWN-LANG-"]:
-            self.parent.settings["-lang-"] = values2["-DROPDOWN-LANG-"]
-            self.parent.restart_app = self.parent.yes_or_no_popup(
-                "App language was changed, do you want to restart?")
-            if self.parent.restart_app:
-                self.write_event_value(
-                    "-DONE-", "-RESTART-")
-
-        elif event2 == "-DROPDOWN-THEMES-":
-            self.parent.chosen_theme = values2["-DROPDOWN-THEMES-"]
-            if self.parent.chosen_theme != self.parent.settings["-theme-"]:
-                self.parent.restart_app = self.parent.yes_or_no_popup(
-                    "Theme was changed, Do you want to restart application?")
-                if self.parent.restart_app:
-                    self.write_event_value(
-                        "-DONE-", "-RESTART-")
-
-        elif event2 == "-DROPDOWN-ATHANS-":
-            # get a list of all athans currently in folder
-            # as user might have downloaded before
-            downloaded_athans = os.listdir(ATHANS_DIR)
-            chosen_athan = f"{values2['-DROPDOWN-ATHANS-'].replace(' ', '_')}.mp3"
-            if chosen_athan in downloaded_athans:  # athan is already in Athans directory
-                self.parent.settings["-athan-sound-"] = chosen_athan
-                self.parent.play_current_athan()
-
-            else:  # athan is not on pc, will be downloaded from the internet
-                self.start_download_process(chosen_athan)
-
-            # Debugging
-            print("[DEBUG] Current athan:",
-                  self.parent.settings["-athan-sound-"])
-
-        elif event2 == "-DROPDOWN-METHODS-":
-            self.parent.settings["-used-method-"] = self.parent.pt.get_method_id(
-                values2["-DROPDOWN-METHODS-"])
-
-            if self.parent.settings["-used-method-"] == 99:
-                self["-SET-CUSTOM-ANGLES-"].update(disabled=False)
-                self["-FAJR-ANGLE-IN-"].update(
-                    disabled=False, text_color=sg.theme_input_text_color())
-                self["-ISHA-ANGLE-IN-"].update(
-                    disabled=False, text_color=sg.theme_input_text_color())
-            else:
-                self["-SET-CUSTOM-ANGLES-"].update(disabled=True)
-                used_method_params = self.parent.pt.get_method_params(
-                    self.parent.settings["-used-method-"])
-                self["-FAJR-ANGLE-IN-"].update(
-                    value=used_method_params["fajr_angle"], disabled=True, text_color="grey")
-                self["-ISHA-ANGLE-IN-"].update(
-                    value=used_method_params.get("isha_angle", "not used"), disabled=True, text_color="grey")
-
-            self.apply_calculation_changes()
-
-        elif event2 == "-SET-CUSTOM-ANGLES-":
-            try:
-                fajr = float(self["-FAJR-ANGLE-IN-"].get())
-                isha = float(self["-ISHA-ANGLE-IN-"].get())
-                if fajr < 0 or isha < 0 or fajr > 20 or isha > 20:
-                    raise ValueError
-
-                self.parent.settings["-custom-angles-"] = [fajr, isha]
-                self.apply_calculation_changes()
-
-                self["-FAJR-ANGLE-IN-"].update(
-                    background_color=sg.theme_input_background_color())
-                self["-ISHA-ANGLE-IN-"].update(
-                    background_color=sg.theme_input_background_color())
-
-            except (TypeError, ValueError):
-                self["-FAJR-ANGLE-IN-"].update(
-                    background_color="dark red")
-                self["-ISHA-ANGLE-IN-"].update(
-                    background_color="dark red")
-
-        elif event2 == "-RESET-OFFSET-":
-            self.reset_prayer_offsets()
-
-        return win_active
-
     def change_toggle_button_state(self, key):
         """method to toggle the state of a button using it's metadata attribute
 
@@ -404,6 +264,163 @@ class SettingsWindow(sg.Window):
         for prayer in self.parent.displayed_times:
             self.parent.settings["-offset-"][f"-{prayer}-"] = 0
             self[f"-{prayer.upper()}-OFFSET-"].update(value=0)
+
+    def run_event_loop(self, timeout=100):
+        """method for handling events that come from the settings window
+
+        :param int timeout: the timeout for the read method
+        :return bool: boolean value that indicates whether the settings window is still open or not
+        """
+        win_active = True
+        event2, values2 = self.read(timeout=timeout)
+        self.disable_debugger()
+
+        if event2 == sg.TIMEOUT_KEY:
+            pass
+
+        elif event2 in (sg.WIN_CLOSE_ATTEMPTED_EVENT, "-DONE-"):
+            win_active = False
+            action_type = values2.get("-DONE-", None)
+            print("[DEBUG] Settings exit action:", action_type)
+            self.parent.save_loc_check = self["-TOGGLE-SAVE-LOCATION-"].metadata
+            self.parent.settings["-custom-athan-"] = self["-CUSTOM-ATHAN-NAME-"].get()
+
+            if self.offset_changed():
+                self.parent.pt.update_prayer_offset()
+                self.apply_calculation_changes()
+
+            self.close()
+            if action_type == "-RESTART-":
+                mixer.music.unload()
+                self.parent.restart_app = True
+                self.parent.window.write_event_value("-EXIT-", None)
+
+            elif action_type == "-EXIT-":
+                self.parent.window.write_event_value("-EXIT-", None)
+
+        elif event2 in ("-EXIT-", "-RESTART-"):
+            self.write_event_value(
+                "-DONE-", event2)
+
+        elif event2.startswith("-TOGGLE-"):
+            self.handle_toggle_event(event2)
+
+        elif event2.startswith("-DROPDOWN-"):
+            self.handle_dropdown_event(event2, values2[event2])
+
+        elif event2 == "-SET-CUSTOM-ANGLES-":
+            try:
+                fajr = float(self["-FAJR-ANGLE-IN-"].get())
+                isha = float(self["-ISHA-ANGLE-IN-"].get())
+                if fajr < 0 or isha < 0 or fajr > 20 or isha > 20:
+                    raise ValueError
+
+                self.parent.settings["-custom-angles-"] = [fajr, isha]
+                self.apply_calculation_changes()
+
+                self["-FAJR-ANGLE-IN-"].update(
+                    background_color=sg.theme_input_background_color())
+                self["-ISHA-ANGLE-IN-"].update(
+                    background_color=sg.theme_input_background_color())
+
+            except (TypeError, ValueError):
+                self["-FAJR-ANGLE-IN-"].update(
+                    background_color="dark red")
+                self["-ISHA-ANGLE-IN-"].update(
+                    background_color="dark red")
+
+        elif event2 == "-RESET-OFFSET-":
+            self.reset_prayer_offsets()
+
+        return win_active
+
+    def handle_toggle_event(self, toggle_key):
+        """event handling for toggle events
+
+        :param str toggle_key: toggle element key
+        """
+        if toggle_key == "-TOGGLE-MUTE-":
+            self.change_toggle_button_state(toggle_key)
+            self.parent.settings["-mute-athan-"] = self["-TOGGLE-MUTE-"].metadata
+
+        elif toggle_key == "-TOGGLE-CUSTOM-ATHAN-":
+            self.change_toggle_button_state(toggle_key)
+            self.parent.settings["-use-custom-athan-"] = self["-TOGGLE-CUSTOM-ATHAN-"].metadata
+
+            self["-DROPDOWN-ATHANS-"].update(
+                disabled=self.parent.settings["-use-custom-athan-"])
+            self["-CUSTOM-ATHAN-BROWSE-"].update(
+                disabled=not self.parent.settings["-use-custom-athan-"])
+
+            if self.parent.settings["-use-custom-athan-"]:
+                self["-DROPDOWN-ATHANS-"].update(
+                    value="Custom")
+            else:
+                self["-DROPDOWN-ATHANS-"].update(
+                    value=self.parent.settings["-athan-sound-"][:-4].replace("_", " "))
+
+        elif toggle_key == "-TOGGLE-SAVE-LOCATION-":
+            self.change_toggle_button_state(toggle_key)
+
+    def handle_dropdown_event(self, dropdown_key, dropdown_value):
+        """event handling for combobox/dropdown events
+
+        :param str dropdown_key: dropdown element key
+        :param str dropdown_value: value chosen from the dropdown list
+        """
+        if dropdown_key == "-DROPDOWN-LANG-" and self.parent.settings["-lang-"] != dropdown_value:
+            self.parent.settings["-lang-"] = dropdown_value
+            self.parent.restart_app = self.parent.yes_or_no_popup(
+                "App language was changed, do you want to restart?")
+            if self.parent.restart_app:
+                self.write_event_value(
+                    "-DONE-", "-RESTART-")
+
+        elif dropdown_key == "-DROPDOWN-THEMES-":
+            self.parent.chosen_theme = dropdown_value
+            if self.parent.chosen_theme != self.parent.settings["-theme-"]:
+                self.parent.restart_app = self.parent.yes_or_no_popup(
+                    "Theme was changed, Do you want to restart application?")
+                if self.parent.restart_app:
+                    self.write_event_value(
+                        "-DONE-", "-RESTART-")
+
+        elif dropdown_key == "-DROPDOWN-ATHANS-":
+            # get a list of all athans currently in folder
+            # as user might have downloaded before
+            downloaded_athans = os.listdir(ATHANS_DIR)
+            chosen_athan = f"{dropdown_value.replace(' ', '_')}.mp3"
+            if chosen_athan in downloaded_athans:  # athan is already in Athans directory
+                self.parent.settings["-athan-sound-"] = chosen_athan
+                self.parent.play_current_athan()
+
+            else:  # athan is not on pc, will be downloaded from the internet
+                self.start_download_process(chosen_athan)
+
+            # Debugging
+            print("[DEBUG] Current athan:",
+                  self.parent.settings["-athan-sound-"])
+
+        elif dropdown_key == "-DROPDOWN-METHODS-":
+            self.parent.settings["-used-method-"] = self.parent.pt.get_method_id(
+                dropdown_value)
+
+            if self.parent.settings["-used-method-"] == 99:
+                self["-SET-CUSTOM-ANGLES-"].update(disabled=False)
+                self["-FAJR-ANGLE-IN-"].update(
+                    disabled=False, text_color=sg.theme_input_text_color())
+                self["-ISHA-ANGLE-IN-"].update(
+                    disabled=False, text_color=sg.theme_input_text_color())
+            else:
+                self["-SET-CUSTOM-ANGLES-"].update(disabled=True)
+                used_method_params = self.parent.pt.get_method_params(
+                    self.parent.settings["-used-method-"])
+                self["-FAJR-ANGLE-IN-"].update(
+                    value=used_method_params["fajr_angle"], disabled=True, text_color="grey")
+                self["-ISHA-ANGLE-IN-"].update(
+                    value=used_method_params.get("isha_angle", "not used"), disabled=True, text_color="grey")
+
+            self.apply_calculation_changes()
 
 
 class ChooseLocationWindow(sg.Window):
