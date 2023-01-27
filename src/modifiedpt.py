@@ -18,15 +18,9 @@ class ModifiedPrayerTimes(PrayerTimes):
         self.update_time()
         self.tomorrow = self.now+datetime.timedelta(days=1)
 
+        self.prayer_offsets = None
+        self.update_prayer_offset()
         self.coords = self.parent.settings["-location-"]["-coordinates-"]
-        self.prayer_offsets = PrayerAdjustments(
-            self.parent.settings["-offset-"]["-Fajr-"],
-            self.parent.settings["-offset-"]["-Sunrise-"],
-            self.parent.settings["-offset-"]["-Dhuhr-"],
-            self.parent.settings["-offset-"]["-Asr-"],
-            self.parent.settings["-offset-"]["-Maghrib-"],
-            self.parent.settings["-offset-"]["-Isha-"]
-        )
         self.calculation_methods = {
             1: (CalculationMethod.KARACHI, "University of Islamic Sciences in Karachi"),
             2: (CalculationMethod.NORTH_AMERICA, "Islamic Society of North America (ISNA)"),
@@ -61,6 +55,17 @@ class ModifiedPrayerTimes(PrayerTimes):
         """
         self.now = datetime.datetime.now(
             tz=ZoneInfo(self.parent.settings["-location-"]["-timezone-"])).replace(microsecond=0)
+
+    def update_prayer_offset(self):
+        """method to update the currently used prayer offsets from the settings file"""
+        self.prayer_offsets = PrayerAdjustments(
+            self.parent.settings["-offset-"]["-Fajr-"],
+            self.parent.settings["-offset-"]["-Sunrise-"],
+            self.parent.settings["-offset-"]["-Dhuhr-"],
+            self.parent.settings["-offset-"]["-Asr-"],
+            self.parent.settings["-offset-"]["-Maghrib-"],
+            self.parent.settings["-offset-"]["-Isha-"]
+        )
 
     def prayer_time_came(self):
         """method to check whether next prayer time came & notify the user if that's the case

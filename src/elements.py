@@ -233,8 +233,10 @@ class SettingsWindow(sg.Window):
             self.close()
 
             if offset_changed:
-                self.parent.restart_app = self.parent.yes_or_no_popup(
-                    "Prayer offsets were changed, do you want to restart application?")
+                self.parent.pt.update_prayer_offset()
+                self.parent.pt.update_current_furood(self.parent.pt.now)
+                self.parent.pt.update_current_and_next_prayer()
+                self.parent.window.refresh_prayers_in_ui(True)
 
             if action_type == "-RESTART-" or self.parent.restart_app:
                 mixer.music.unload()
