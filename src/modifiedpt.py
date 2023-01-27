@@ -39,13 +39,12 @@ class ModifiedPrayerTimes(PrayerTimes):
         self.current_furood = None
         self.current_fard, self.upcoming_fard = None, None
 
+        if self.parent.calculation_data["method"]["id"] in self.calculation_methods:
+            self.parent.settings["-default-method-"] = self.parent.calculation_data["method"]["id"]
+        else:
+            self.parent.settings["-default-method-"] = 4
+
         if not self.parent.settings["-used-method-"]:
-
-            if self.parent.calculation_data["method"]["id"] in self.calculation_methods:
-                self.parent.settings["-default-method-"] = self.parent.calculation_data["method"]["id"]
-            else:
-                self.parent.settings["-default-method-"] = 4
-
             self.parent.settings["-used-method-"] = self.parent.settings["-default-method-"]
 
         self.update_current_furood(date=date)
