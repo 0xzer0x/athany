@@ -127,6 +127,7 @@ Install the [latest stable version][latest-release] using the windows setup prov
     pyinstaller --noconfirm --onedir --windowed --icon 'images/athany_icon.ico' --add-data 'src/Data;src/Data' --name 'athany' main.py
 ```
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 <!-- USAGE EXAMPLES -->
 
 ## Usage
@@ -150,6 +151,10 @@ the custom athan tab allows you to choose a local audio file (.wav, .mp3) to pla
 ![settings-window-offset-tab][settings-window-offset-tab]
 
 the offset tab allows you to adjust prayer times by adding/subtracting minutes from the default calculated time
+
+![advanced-settings-tab][advanced-settings-tab]
+
+the advanced settings tab allows you to use a different calculation method or set the calculation parameters manually. It also shows you the default method used in your country
 
 [check out other screenshots](https://github.com/0xzer0x/athany/tree/master/images)
 
@@ -219,10 +224,11 @@ Project Link: [https://github.com/0xzer0x/athany](https://github.com/0xzer0x/ath
 [python-url]: https://python.org
 [psg-url]: https://pysimplegui.org
 [banner]: images/banner.jpg
-[choose-location]: images/choose-location-120-en.png
-[main-window]: images/main-window-120-en.png
-[settings-window-general-tab]: images/general-settings-120-en.png
-[settings-window-custom-athan-tab]: images/custom-athan-120-en.png
-[settings-window-offset-tab]: images/offset-tab-120-en.png
+[choose-location]: images/choose-location-121-en.png
+[main-window]: images/main-window-121-en.png
+[settings-window-general-tab]: images/general-settings-121-en.png
+[settings-window-custom-athan-tab]: images/custom-athan-121-en.png
+[settings-window-offset-tab]: images/offset-tab-121-en.png
+[advanced-settings-tab]: images/advanced-settings-121-en.png
 [gnome-appindicator-ext]: https://extensions.gnome.org/extension/615/appindicator-support/
 [fonts-download-url]: https://github.com/0xzer0x/athany/releases/download/1.0.0-stable/fonts.zip
