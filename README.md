@@ -91,7 +91,7 @@ Install the [latest stable version][latest-release] using the windows setup prov
 1. Install dependencies (Linux users only)
 
    ```sh
-   sudo apt-get install -y python3-tk python3-dev libappindicator3-1
+   sudo apt-get install -y python3-tk python3-dev libappindicator3-1 libappindicator3-dev
    ```
 
 2. Clone the repo
