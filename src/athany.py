@@ -415,7 +415,7 @@ class Athany:
             prog_win = None
             saved_file = os.path.join(ATHANS_DIR, athan_filename)
             with open(saved_file, "wb") as athan_file:
-                file_data = requests.get("https://s3.us-east-1.amazonaws.com/athany-data/mp3/"+athan_filename,
+                file_data = requests.get("https://github.com/0xzer0x/athany/raw/master/src/Data/Athans/"+athan_filename,
                                          stream=True, timeout=10)
                 file_size = int(file_data.headers.get("content-length"))
 
