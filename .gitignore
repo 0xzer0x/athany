@@ -10,5 +10,3 @@ _*
 !requirements.txt
 !available_athans.txt
 src/Data/*.json
-src/Data/Athans/*
-!src/Data/Athans/Abdul-Basit_(Takbeer_only).mp3
