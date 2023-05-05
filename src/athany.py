@@ -3,7 +3,7 @@ import json
 import sys
 
 import requests
-import hijri_converter
+import hijridate as hj
 from src.elements import sg, mixer
 from src.elements import SettingsWindow, MainWindow, ChooseLocationWindow
 from src.elements import TranslatedText, TranslatedButton
@@ -66,7 +66,7 @@ class Athany:
                 self.settings["-athan-sound-"] not in os.listdir(ATHANS_DIR):
             self.settings["-athan-sound-"] = "Abdul-Basit_(Takbeer_only).mp3"
 
-        if sys.platform == "win32":
+        if sys.platform != "win32":
             self.GUI_FONT = ("Readex Pro", 11)
             self.HIJRI_DATE_FONT = ("Arabic Typesetting", 20)
             if self.settings["-lang-"] == 'ar':
@@ -148,7 +148,7 @@ class Athany:
         """function to return arabic hijri date string to display in main window
         :return: (str) Arabic string of current Hijri date
         """
-        hijri_date = hijri_converter.Gregorian.today().to_hijri()
+        hijri_date = hj.Gregorian.today().to_hijri()
         unformatted_text = f"{hijri_date.day_name(language='ar')} {hijri_date.day} {hijri_date.month_name(language='ar')} {hijri_date.year}"
         return Translator.display_ar_text(text=unformatted_text)
 

@@ -6,4 +6,4 @@ requests
 pygame
 python-bidi
 arabic-reshaper
-hijri-converter
+hijridate
