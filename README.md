@@ -118,13 +118,13 @@ Install the [latest stable version][latest-release] using the windows setup prov
 
 ### Building from source
 
-**Replace the single-quotes with double-quotes if you're using windows**
+**Replace the single-quotes with double-quotes if you're using windows and : with ;**
 
 - After the installation steps, execute the following commands. You will find the built application folder in the _dist_ directory
 
 ```sh
     pip install pyinstaller
-    pyinstaller --noconfirm --onedir --windowed --icon 'images/athany_icon.ico' --add-data 'src/Data;src/Data' --name 'athany' main.py
+    pyinstaller --noconfirm --onedir --windowed --icon 'images/athany_icon.ico' --add-data 'src/Data:src/Data' --name 'athany' main.py
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
